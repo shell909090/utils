@@ -1,3 +1,15 @@
+# 7zptocmx #
+
+This program can translate all kind of package to standard comic package, jpeg image format, zip package. It support rar, zip, 7z, and support 7z file in rar file.
+
+Source is released by GPL, please check source code for more infomation.
+
+# 7zptocmx #
+
+这个程序是用于将各种格式的压缩文件转换为标准的压缩文件，zip压缩，jpeg格式。支持的格式有rar，zip，7z。包括压缩包内嵌套7z。
+
+程序基于GPL开放源码，具体请查看文件。
+
 # geted2k #
 
 geted2k is a program to fetch and commit ed2k link from a web page, this program is designed for verycd.com, but can also used to any web page.

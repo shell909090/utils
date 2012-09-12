@@ -92,6 +92,7 @@ def lzip_to_dir(base, f):
     lzip_decmp(path.join(base, f), path.join(base, mainname))
     os.remove(path.join(base, f))
 
+# try use recursion
 def trans_lz(filepath):
     cur_path = os.getcwd()
     fullpath = path.abspath(filepath)
