@@ -458,24 +458,21 @@ basehtml='''<!DOCTYPE html>
 
 template = jinja2.Template(basehtml)
 
-def translate_slide(slide_src):
-    header, content = slide_src.strip().split('\n', 1)
+def translate_code(match):
+    from pygments import highlight, formatters, lexers
+    formatter = formatters.HtmlFormatter(noclasses=True, nobackground=True)
 
-    while '<code>!' in content:
-        import pygments
-        lang_match = re.search('<code>!(.+)\n', content)
-        if lang_match:
-            lang = lang_match.group(1)
-            code = content.split(lang, 1)[1].split('</code', 1)[0]
-            lexer = get_lexer_by_name(lang)
-            formatter = HtmlFormatter(linenos='inline', noclasses=True,
-                                      nobackground=True)
-            pretty_code = pygments.highlight(code, lexer, formatter)
-            pretty_code = pretty_code.replace('&amp;', '&')
-            before_code = content.split('<code>', 1)[0]
-            after_code = content.split('</code>', 1)[1]
-            content = before_code + pretty_code + after_code
-    return {'header': header, 'content': content}
+    code = match.group(1)
+    code = code.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+    return highlight(code, lexers.guess_lexer(code), formatter)
+
+recode = re.compile(u'<pre><code>(.+)</code></pre>', re.S)
+def translate_slide(slide_src):
+    try:
+        header, content = slide_src.strip().split('\n', 1)
+        if not header.startswith('<h'): header, content = '', slide_src
+    except ValueError: header, content = '', slide_src
+    return {'header': header, 'content': recode.sub(translate_code, content)}
 
 def translate(src):
     vars = {'width': 700, 'height': 700}
