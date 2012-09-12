@@ -444,15 +444,13 @@ basehtml='''<!DOCTYPE html>
           <div class="slide">
               <header>{{ slide.header }}</header>
               {% if slide.content %}
-                  <section>{{ slide.content }}</section>
+              <section>{{ slide.content }}</section>
               {% endif %}
           </div>
         {% endfor %}
       </div>
     </div>
-    <script>
-        main()
-    </script>
+    <script>main()</script>
 </body>
 </html>'''
 
@@ -475,7 +473,7 @@ def translate_slide(slide_src):
     return {'header': header, 'content': recode.sub(translate_code, content)}
 
 def translate(src):
-    vars = {'width': 700, 'height': 700}
+    vars = {'width': 800, 'height': 800}
     if '-w' in optdict: vars['width'] = int(optdict['-w'])
     if '-h' in optdict: vars['height'] = int(optdict['-h'])
     slides_src = src.split('<hr />\n')

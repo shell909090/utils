@@ -1,0 +1,142 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+'''
+@date: 2010-06-07
+@author: shell.xu
+@license:
+    Copyright (C) 2012 Shell Xu
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
+import os, sys, shutil, getopt, zipfile, tempfile
+from os import path
+
+def init_temp(base): return tempfile.mkdtemp(dir = base)
+
+def free_temp(tmp): shutil.rmtree(tmp)
+
+def up_one_level(pth):
+    ''' up contain if just have one entry in directory '''
+    lpth = os.listdir(pth)
+    if len(lpth) != 1: return
+    downlevel = path.join(pth, lpth[0])
+    tmp_up = path.join(path.dirname(pth), 'tmp')
+    os.rename(downlevel, tmp_up)
+    os.rmdir(pth)
+    os.rename(tmp_up, pth)
+
+def check7zp(src):
+    ''' check if an zip file contain 7z file '''
+    with zipfile.ZipFile(src, 'r') as srcfile:
+        for name in srcfile.namelist():
+            if name.lower().endswith('.7z'): return True
+    return False
+
+def rar_decmp(src, tgt):
+    os.chdir(tgt)
+    os.system('unrar x "%s"' % src)
+    up_one_level(tgt)
+
+def lzip_decmp(src, tgt):
+    os.chdir(tgt)
+    os.system('7zr x "%s"' % src)
+    up_one_level(tgt)
+
+def zip_decmp(src, tgt):
+    os.chdir(tgt)
+    os.system('unzip "%s"' % src)
+    up_one_level(tgt)
+
+def decompress(src, tgt):
+    ext = path.splitext(src)[1].lower()
+    filemap = {'.zip': zip_decmp, '.rar': rar_decmp, '.7z': lzip_decmp}
+    try: return filemap[ext](src, tgt)
+    except KeyError: raise Exception('unknown source format %s' % ext)
+
+def zip_cmp(src, tgt):
+    with zipfile.ZipFile(tgt, 'w', zipfile.ZIP_DEFLATED) as tgtfile:
+        for base, dirs, files in os.walk(src):
+            for f in files:
+                tgtpath = path.join(base, f)
+                tgtfile.write(tgtpath, tgtpath[len(src)+1:])
+
+def pic_to_jpg(pth):
+    ''' translate all file under path to jpeg format if can '''
+    for base, dirs, files in os.walk(pth):
+        os.chdir(base)
+        for i, f in enumerate(files):
+            ext = path.splitext(f)
+            if ext[1].lower() in ('.jpg', '.jpeg'): continue
+            os.system('convert "%s" "%s.jpg"' % (f, ext[0]))
+            os.remove(f)
+            sys.stdout.write('process %s (%d/%d)...\r' % (base, i, len(files)))
+    print 'process done.              \r\n'
+
+def lzip_to_dir(base, f):
+    mainname = path.splitext(f)[0]
+    os.chdir(base)
+    try: os.mkdir(mainname)
+    except OSError: pass
+    print base, f, mainname
+    lzip_decmp(path.join(base, f), path.join(base, mainname))
+    os.remove(path.join(base, f))
+
+def trans_lz(filepath):
+    cur_path = os.getcwd()
+    fullpath = path.abspath(filepath)
+    tmp = init_temp('/tmp/' if '-t' in optdict else cur_path)
+    try:
+        decompress(fullpath, tmp)
+        for base, dirs, files in os.walk(tmp):
+            for f in files:
+                if path.splitext(f)[1].lower() == '.7z': lz_to_dir(base, f)
+        pic_to_jpg(tmp)
+        zip_cmp(tmp, '%s-new.zip' % path.splitext(fullpath)[0])
+    finally:
+        if '-f' in optdict: free_temp(tmp)
+    os.chdir(cur_path)
+
+def check_dir(filepath):
+    for base, dirs, files in os.walk(filepath):
+        for f in files:
+            if path.splitext(f)[1].lower() == '.7z':
+                yield path.join(base, f)
+            elif path.splitext(f)[1].lower() == '.zip':
+                fullpath = path.join(base, f)
+                if check7zp(fullpath): yield fullpath
+
+def main():
+    '''
+    -h: help
+    -t: use /tmp as temp base
+    -f: free temp directory
+    -l: list file contain 7z
+    -j: smp process
+    '''
+    # TODO: -j 4
+    global optdict
+    optlist, args = getopt.getopt(sys.argv[1:], 'fj:hl')
+    optdict = dict(optlist)
+    if '-h' in optdict or not args:
+        exe = path.basename(sys.argv[0])
+        print '%s v1.0\nusage: %s [-h] [-f] [-l] filename' % (exe, exe)
+        print main.__doc__
+        return
+    if '-l':
+        for arg in args:
+            for i in check_dir(arg): print i
+        return
+    for arg in args: trans_lz(arg)
+
+if __name__ == '__main__': main()
