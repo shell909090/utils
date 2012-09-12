@@ -1,0 +1,48 @@
+#!/usr/bin/python
+'''
+@date: 2012-05-12
+@author: shell.xu
+@license:
+    Copyright (C) 2012 Shell Xu
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
+import re, sys, zlib, base64, getopt
+from os import path
+
+def pack(filepath):
+    with open(filepath, 'r') as fi:
+        r = base64.b64encode(zlib.compress(fi.read()))
+    with open(filepath, 'w') as fo:
+        fo.write('''#!/usr/bin/python
+exec(compile(__import__('zlib').decompress(__import__('base64').b64decode('%s')), '', 'exec'))''' % r)
+
+re_exec = re.compile('''exec\(compile\S*zlib\S*decompress\S*base64\S*b64decode\('(.*)'\)\), '', 'exec'\)\)''')
+def unpack(filepath):
+    with open(filepath, 'r') as fi:
+        for line in fi:
+            if line.startswith('exec'): r = re_exec.match(line).groups(1)[0]
+    with open(filepath, 'w') as fo:
+        fo.write(zlib.decompress(base64.b64decode(r)))
+
+def help():
+    print '%s v1.0 written by Shell.Xu' % path.basename(sys.argv[0])
+    print '%s [-u] target' % path.basename(sys.argv[0])
+
+if __name__ == '__main__':
+    optlist, argv = getopt.getopt(sys.argv[1:], 'u')
+    f = unpack if '-u' in dict(optlist) else pack
+    if argv:
+        for arg in argv: f(path.expanduser(arg))
+    else: help()

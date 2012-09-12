@@ -1,0 +1,77 @@
+#!/usr/bin/python
+'''
+@date: 2012-05-12
+@author: shell.xu
+@license:
+    Copyright (C) 2012 Shell Xu
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
+import os, sys, base64, getopt, urllib, urllib2, getpass
+from os import path
+
+def geturl(url, username=None, password=None):
+    request = urllib2.Request(url)
+    if username and password:
+        b64str = base64.encodestring('%s:%s' % (username, password))
+        request.add_header("Authorization",
+                           "Basic %s" % b64str.replace('\n', ''))
+    return urllib2.urlopen(request).read()
+
+def getlist(url):
+    return os.popen('lynx --dump --listonly --nonumbers %s' % url)
+
+def filter_ed2k(s):
+    for i in s:
+        if i.startswith('ed2k'): yield i.strip()
+
+def commit_mldonkey(ed2k):
+    try:
+        geturl("http://localhost:4080/submit?q=dllink+%s" % urllib.quote(ed2k),
+               optdict['-u'], optdict['password'])
+        return True
+    except: return False
+
+def proced2k(ed2k):
+    if ed2k.startswith('ed2k://|subscribe|'): return
+    if '-c' in optdict: commit_mldonkey(ed2k)
+    if '-r' not in optdict: ed2k = urllib.unquote(ed2k)
+    print ed2k
+
+def main():
+    '''
+    -c: commit
+    -h: help
+    -r: raw mode
+    -u: username
+    if the argument is -, ed2k list will be read from stdin
+    and do like download from net.
+    '''
+    global optdict
+    optlist, args = getopt.getopt(sys.argv[1:], 'chru:')
+    optdict = dict(optlist)
+    if '-h' in optdict or not args:
+        exe = path.basename(sys.argv[0])
+        print '%s v1.0\nusage: %s [-h] [-u username] [-c] [-r] url' % (exe, exe)
+        print main.__doc__
+        return
+    if '-u' in optdict:
+        optdict['password'] = getpass.getpass('password[%s]: ' % optdict['-u'])
+    if len(args) == 1 and args[0] == '-':
+        for line in sys.stdin: proced2k(line.strip())
+        return
+    for url in args:
+        for ed2k in filter_ed2k(getlist(url)): proced2k(ed2k)
+
+if __name__ == '__main__': main()

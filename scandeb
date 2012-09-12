@@ -1,0 +1,90 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+'''
+@date: 2011-02-28
+@author: shell.xu
+@license:
+    Copyright (C) 2012 Shell Xu
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
+import os
+import sys
+import getopt
+from os import path
+
+POOL_DIR = path.realpath('pool')
+DIST_DIR = path.realpath('dists')
+
+def scan_for_arches(dirname):
+    f = lambda n: path.splitext(n)[0].split('_')[2]
+    return set(map(f, os.listdir(dirname)))
+
+def scan_dir(dirname, release, category, arch):
+    try: os.makedirs(path.join(DIST_DIR, release, category, 'binary-%s' % arch))
+    except OSError: pass
+    scan = 'dpkg-scanpackages -a %s pool/%s/%s /dev/null > dists/%s/%s/binary-%s/Packages'
+    os.system(scan % (arch, release, category, release, category, arch))
+    gz = 'gzip -c dists/%s/%s/binary-%s/Packages >dists/%s/%s/binary-%s/Packages.gz'
+    os.system(gz % (release, category, arch, release, category, arch))
+
+def archive_release(release):
+    dist_release_dir = path.join(DIST_DIR, release)
+    release_fullpath = path.join(dist_release_dir, 'Release')
+    gpg_fullpath = path.join(dist_release_dir, 'Release.gpg')
+    try: os.remove(release_fullpath)
+    except OSError: pass
+    try: os.remove(gpg_fullpath)
+    except OSError: pass
+    with os.popen('apt-ftparchive release "%s" -o %s -o APT::FTPArchive::Release::Codename="%s"' % \
+                      (dist_release_dir, 'APT::FTPArchive::Release::Origin="shell"', release)) as sf:
+        with open(release_fullpath, 'wb') as of: of.write(sf.read())
+
+def scan_pool():
+    try: os.remove(POOL_DIR)
+    except OSError: pass
+    for release in os.listdir(POOL_DIR):
+        release_dir = path.join(POOL_DIR, release)
+        for category in os.listdir(release_dir):
+            category_dir = path.join(release_dir, category)
+            for arch in scan_for_arches(category_dir):
+                scan_dir(category_dir, release, category, arch)
+        archive_release(release)
+
+def sign_dist(user = None):
+    for release in os.listdir(POOL_DIR):
+        release_fullpath = path.join(DIST_DIR, release, 'Release')
+        gpg_fullpath = path.join(DIST_DIR, release, 'Release.gpg')
+        if not user: os.system('gpg -abs -o "%s" "%s"' % (gpg_fullpath, release_fullpath))
+        else: os.system('gpg -u "%s" -abs -o "%s" "%s"' % (user, gpg_fullpath, release_fullpath))
+
+def main():
+    '''
+    scan deb pool under current dir, and make dists.
+    if run with -s option, sign dist with gpg keys.
+    -h: help
+    -s: sign dist
+    -u: sign with username, pass to gpg
+    '''
+    opts, args = getopt.getopt(sys.argv[1:], 'hsu:')
+    optd = dict(opts)
+    if '-h' in optd:
+        exe = path.basename(sys.argv[0])
+        print '%s v1.0\nusage: %s [-h] [-u username] [-s]' % (exe, exe)
+        print main.__doc__
+        return
+    scan_pool()
+    if '-s' in optd: sign_dist(optd.get('-u', None))
+
+if __name__ == '__main__': main()
