@@ -4,504 +4,143 @@
 @date: 2012-09-11
 @author: shell.xu
 @license:
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
+  Copyright (C) 2012 Shell Xu <shell909090@gmail.com>
 
-     http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
-
-  Original slides: Marcin Wichary (mwichary@google.com)
-  Modifications: Ernest Delgado (ernestd@google.com)
-                 Alex Russell (slightlyoff@chromium.org)
-
-  html5-slides-markdown Modifications: Adam Zapletal (adamzap@gmail.com)
-
-  md2slide Modifications: Shell Xu <shell909090@gmail.com>
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+   
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+   
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
 '''
-import os, re, sys, jinja2, getopt
+import os, re, sys, getopt
+from mako.template import Template
+from BeautifulSoup import BeautifulSoup
 from os import path
 
-basehtml='''<!DOCTYPE html>
-<!--
-  Copyright 2010 Google Inc.
-
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-     http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
-
-  Original slides: Marcin Wichary (mwichary@google.com)
-  Modifications: Ernest Delgado (ernestd@google.com)
-                 Alex Russell (slightlyoff@chromium.org)
-
-  html5-slides-markdown Modifications: Adam Zapletal (adamzap@gmail.com)
-
-  md2slide Modifications: Shell Xu <shell909090@gmail.com>
--->
-<html>
-<head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <title>{{ head_title }}</title>
-    <style type = "text/css">
-        body {
-          font: 14px "Lucida Grande", "Trebuchet MS", Verdana, sans-serif;
-          background: #778;
-          padding: 0;
-          margin: 0;
-          overflow: hidden;
-        }
-
-        div.presentation {
-          position: absolute;
-          width: 100%;
-          display: table-cell;
-          vertical-align: middle;
-          height: 100%;
-          background: inherit;
-        }
-
-        div.slides {
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          left: 0;
-          top: 0;
-          position: absolute;
-          display: block;
-          -webkit-transition: -webkit-transform 1s ease-in-out;
-          -moz-transition: -moz-transform 1s ease-in-out;
-          -o-transition: -o-transform 1s ease-in-out;
-        }
-
-        div.slide {
-          display: none;
-          position: absolute;
-          overflow: hidden;
-          width: {{width}}px;
-          height: {{height}}px;
-          left: 50%;
-          top: 50%;
-          margin-top: -{{height/2}}px;
-          background: -webkit-gradient(linear, left bottom, left top, from(#bbd), to(#fff));
-          -webkit-transition: margin 0.25s ease-in-out;
-          background-color: #eee;
-          background: -moz-linear-gradient(bottom, #bbd, #fff);
-          -moz-transition: margin 0.25s ease-in-out;
-          -o-transition: margin 0.25s ease-in-out;
-          border-top-left-radius: 20px;
-          -moz-border-radius-topleft: 20px;
-          -webkit-border-top-left-radius: 20px;
-          border-top-right-radius: 20px;
-          -moz-border-radius-topright: 20px;
-          -webkit-border-top-right-radius: 20px;
-          border-bottom-right-radius: 20px;
-          -moz-border-radius-bottomright: 20px;
-          -webkit-border-bottom-right-radius: 20px;
-          border-bottom-left-radius: 20px;
-          -moz-border-radius-bottomleft: 20px;
-          -webkit-border-bottom-left-radius: 20px;
-        }
-
-        div.slide p {
-          font-size: 20px;
-        }
-
-        .slide.far-past {
-          display: block;
-          margin-left: -2400px;
-        }
-
-        .slide.past {
-          display: block;
-          margin-left: -{{width * 1.7}}px;
-        }
-
-        .slide.current {
-          display: block;
-          margin-left: -{{width/2}}px;
-        }
-
-        .slide.future {
-          display: block;
-          margin-left: {{width * 0.7}}px;
-        }
-
-        .slide.far-future {
-          display: block;
-          margin-left: 1500px;
-        }
-
-        body.three-d div.slides {
-          -webkit-transform: translateX(50px) scale(0.8) rotateY(10deg);
-          -moz-transform: translateX(50px) scale(0.8) rotateY(10deg);
-          -o-transform: translateX(50px) scale(0.8) rotateY(10deg);
-        }
-
-
-        /* Content */
-
-        header:not(:only-child) {
-          font-family: 'Lucida Grande';
-          font-weight: normal;
-          font-size: 50px;
-          letter-spacing: -.05em;
-          color: white;
-          color: black;
-          text-shadow: rgba(0, 0, 0, 0.2) 0 2px 5px;
-          position: absolute;
-          left: 30px;
-          top: 25px;
-          margin: 0;
-          padding: 0;
-        }
-
-        h1 {
-          display: inline;
-          font-size: 100%;
-          font-weight: normal;
-          padding: 0;
-          margin: 0;
-        }
-
-        h2 {
-          font-family: 'Lucida Grande';
-          color: black;
-          font-size: 32px;
-          margin-left: 20px;
-          margin-top: 50px;
-        }
-
-        h2:first-child {
-          margin-top: 0;
-        }
-
-        section, .slide header:only-child h1 {
-          font-family: 'Lucida Grande';
-          color: #3f3f3f;
-          text-shadow: rgba(0, 0, 0, 0.2) 0 2px 5px;
-          margin-left: 30px;
-          margin-right: 30px;
-          margin-top: 100px;
-          display: block;
-          overflow: hidden;
-        }
-
-        a {
-          color: inherit;
-          display: inline-block;
-          text-decoration: none;
-          line-height: 110%;
-          border-bottom: 2px solid #3f3f3f;
-        }
-
-        h2 {
-          padding: 0;
-          margin: 15px 0 5px 0;
-        }
-
-        pre {
-          font-size: 16px;
-          font-family: Monaco, Courier, monospace;
-        }
-
-        li {
-          padding: 10px 0;
-          font-size: 20px;
-        }
-
-        section.title, .slide header:only-child h1 {
-          line-height: 180%;
-          text-align: center;
-          display: table-cell;
-          vertical-align: middle;
-          height: 700px;
-          width: 900px;
-        }
-
-        section.title p, .slide header:only-child h1 {
-          font-size: 50px;
-          margin-top:100px;
-          margin-bottom:100px;
-        }
-    </style>
+basehtml = '''
+<!doctype html>  
+<html lang="en">
+  <head>
+    <title>${title}</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link href='http://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="reveal/main.css">
+    <link rel="stylesheet" href="reveal/default.css" id="theme">
+    <!-- For syntax highlighting -->
+    <link rel="stylesheet" href="reveal/lib/css/zenburn.css">
     <script>
-        function main() {
-          // Since we don't have the fallback of attachEvent and
-          // other IE only stuff we won't try to run JS for IE.
-          // It will run though when using Google Chrome Frame
-          if (document.all) { return; }
-
-          var currentSlideNo;
-          var notesOn = false;
-          var slides = document.getElementsByClassName('slide');
-          var touchStartX = 0;
-
-          // var slide_hash = window.location.hash.replace(/#/, '');
-          // if (slide_hash) {
-          //   for (var i = 0, len = slides.length; i < len; i++) {
-          //     if (slides[i].id == slide_hash) {
-          //       currentSlideNo = i;
-          //       updateSlideClasses();
-          //     }
-          //   }
-          // }
-
-          var spaces = /\s+/, a1 = [""];
-
-          var str2array = function(s) {
-            if (typeof s == "string" || s instanceof String) {
-              if (s.indexOf(" ") < 0) {
-                a1[0] = s;
-                return a1;
-              } else {
-                return s.split(spaces);
-              }
-            }
-            return s;
-          };
-
-          var trim = function(str) {
-            return str.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
-          };
-
-          var addClass = function(node, classStr) {
-            classStr = str2array(classStr);
-            var cls = " " + node.className + " ";
-            for (var i = 0, len = classStr.length, c; i < len; ++i) {
-              c = classStr[i];
-              if (c && cls.indexOf(" " + c + " ") < 0) {
-                cls += c + " ";
-              }
-            }
-            node.className = trim(cls);
-          };
-
-          var removeClass = function(node, classStr) {
-            var cls;
-            if (classStr !== undefined) {
-              classStr = str2array(classStr);
-              cls = " " + node.className + " ";
-              for (var i = 0, len = classStr.length; i < len; ++i) {
-                cls = cls.replace(" " + classStr[i] + " ", " ");
-              }
-              cls = trim(cls);
-            } else {
-              cls = "";
-            }
-            if (node.className != cls) {
-              node.className = cls;
-            }
-          };
-
-          var getSlideEl = function(slideNo) {
-            if (slideNo > 0) {
-              return slides[slideNo - 1];
-            } else {
-              return null;
-            }
-          };
-
-          var getSlideTitle = function(slideNo) {
-            var el = getSlideEl(slideNo);
-
-            if (el) {
-              return el.getElementsByTagName('header')[0].innerHTML;
-            } else {
-              return null;
-            }
-          };
-
-          var changeSlideElClass = function(slideNo, className) {
-            var el = getSlideEl(slideNo);
-
-            if (el) {
-              removeClass(el, 'far-past past current future far-future');
-              addClass(el, className);
-            }
-          };
-
-          var updateSlideClasses = function() {
-            window.location.hash = "slide" + currentSlideNo;
-            changeSlideElClass(currentSlideNo - 2, 'far-past');
-            changeSlideElClass(currentSlideNo - 1, 'past');
-            changeSlideElClass(currentSlideNo, 'current');
-            changeSlideElClass(currentSlideNo + 1, 'future');
-            changeSlideElClass(currentSlideNo + 2, 'far-future');
-          };
-
-          var nextSlide = function() {
-            if (currentSlideNo < slides.length) {
-              currentSlideNo++;
-            }
-
-            updateSlideClasses();
-          };
-
-          var prevSlide = function() {
-            if (currentSlideNo > 1) {
-              currentSlideNo--;
-            }
-            updateSlideClasses();
-          };
-
-          var showNotes = function() {
-            var notes = document.querySelectorAll('.notes');
-            for (var i = 0, len = notes.length; i < len; i++) {
-              notes[i].style.display = (notesOn) ? 'none':'block';
-            }
-            notesOn = (notesOn) ? false:true;
-          };
-
-          var switch3D = function() {
-            if (document.body.className.indexOf('three-d') == -1) {
-              document.getElementsByClassName('presentation')[0].style.webkitPerspective = '1000px';
-              document.body.className += ' three-d';
-            } else {
-              window.setTimeout("document.getElementsByClassName('presentation')[0].style.webkitPerspective = '0';", 2000);
-              document.body.className = document.body.className.replace(/three-d/, '');
-            }
-          };
-
-          var handleBodyKeyDown = function(event) {
-            // console.log(event.keyCode);
-            switch (event.keyCode) {
-              case 37: // left arrow
-                prevSlide();
-                break;
-              case 39: // right arrow
-              // case 32: // space
-                nextSlide();
-                break;
-              case 50: // 2
-                showNotes();
-                break;
-              case 51: // 3
-                switch3D();
-                break;
-            }
-          };
-
-          var addTouchListeners = function() {
-            document.addEventListener('touchstart', function(e) {
-              touchStartX = e.touches[0].pageX;
-            }, false);
-            document.addEventListener('touchend', function(e) {
-              var pixelsMoved = touchStartX - e.changedTouches[0].pageX;
-              var SWIPE_SIZE = 150;
-              if (pixelsMoved > SWIPE_SIZE) {
-                nextSlide();
-              }
-              else if (pixelsMoved < -SWIPE_SIZE) {
-               prevSlide();
-              }
-            }, false);
-          };
-
-          // initialize
-
-          (function() {
-            if (window.location.hash != "") {
-              currentSlideNo = Number(window.location.hash.replace('#slide', ''));
-            } else {
-              currentSlideNo = 1;
-            }
-
-            document.addEventListener('keydown', handleBodyKeyDown, false);
-
-            var els = slides;
-            for (var i = 0, el; el = els[i]; i++) {
-              addClass(el, 'slide far-future');
-            }
-            updateSlideClasses();
-
-            // add support for finger events (filter it by property detection?)
-            addTouchListeners();
-          })();
-        };
+      // If the query includes 'print-pdf' we'll use the PDF print sheet
+      document.write( '<link rel="stylesheet" href="reveal/' + ( window.location.search.match( /print-pdf/gi ) ? 'pdf' : 'paper' ) + '.css" type="text/css" media="print">' );
     </script>
-</head>
-<body>
-    <div class="presentation">
+  </head>
+  <body>
+    <script src="reveal/lib/js/head.min.js"></script>
+    <script src="reveal/reveal.min.js"></script>
+
+    <div class="reveal">
+      <div class="state-background"></div>
+
+      % for slide in slides:
       <div class="slides">
-        <div class="slide">
-            <section class="title">{{ title }}</section>
-        </div>
-        {% for slide in slides %}
-          <div class="slide">
-              <header>{{ slide.header }}</header>
-              {% if slide.content %}
-              <section>{{ slide.content }}</section>
-              {% endif %}
-          </div>
-        {% endfor %}
+	<section>
+	  ${slide}
+	</section>
       </div>
+      % endfor
+
+      <!-- The navigational controls UI -->
+      <aside class="controls">
+	<a class="left" href="#">&#x25C4;</a>
+	<a class="right" href="#">&#x25BA;</a>
+	<a class="up" href="#">&#x25B2;</a>
+	<a class="down" href="#">&#x25BC;</a>
+      </aside>
+
+      <!-- Presentation progress bar -->
+      <div class="progress"><span></span></div>
     </div>
-    <script>main()</script>
-</body>
+
+    <script>
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+      controls: true,
+      progress: true,
+      history: true,
+      
+      theme: Reveal.getQueryHash().theme || 'default', // available themes are in /css/theme
+      transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/linear(2d)
+
+      // Optional libraries used to extend on reveal.js
+      dependencies: [
+      { src: 'reveal/lib/js/highlight.js', async: true, callback: function() { window.hljs.initHighlightingOnLoad(); } },
+      { src: 'reveal/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+      { src: 'reveal/lib/js/showdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+      { src: 'reveal/lib/js/data-markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+      ]
+      });
+    </script>
+  </body>
 </html>'''
+template = Template(basehtml)
 
-template = jinja2.Template(basehtml)
+def bsjoin(l):
+    bs = BeautifulSoup()
+    for i in l: bs.append(i)
+    return bs
 
-def translate_code(match):
-    from pygments import highlight, formatters, lexers
-    formatter = formatters.HtmlFormatter(noclasses=True, nobackground=True)
+def get_slides(src):
+    def splitbs(bs):
+        prevname = 'h1'
+        for i, b in enumerate(bs):
+            if not hasattr(b, 'name'): continue
+            if b.name == 'hr': return bs[:i], bs[i+1:]
+            elif b.name.startswith('h') and not prevname.startswith('h'):
+                return bs[:i], bs[i:]
+            prevname = b.name
+    bs = list(BeautifulSoup(src))
+    r = splitbs(bs)
+    while r:
+        yield bsjoin(r[0])
+        bs = r[1]
+        r = splitbs(bs)
+    yield bsjoin(bs)
 
-    code = match.group(1)
-    code = code.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-    return highlight(code, lexers.guess_lexer(code), formatter)
-
-recode = re.compile(u'<pre><code>(.+)</code></pre>', re.S)
-def translate_slide(slide_src):
-    try:
-        header, content = slide_src.strip().split('\n', 1)
-        if not header.startswith('<h'): header, content = '', slide_src
-    except ValueError: header, content = '', slide_src
-    return {'header': header, 'content': recode.sub(translate_code, content)}
-
-def translate(src):
-    vars = {'width': 800, 'height': 800}
-    if '-w' in optdict: vars['width'] = int(optdict['-w'])
-    if '-h' in optdict: vars['height'] = int(optdict['-h'])
-    slides_src = src.split('<hr />\n')
-
-    vars['title'] = slides_src.pop(0)
-    vars['head_title'] = vars['title'].split('>')[1].split('<')[0]
-
-    vars['slides'] = (translate_slide(s) for s in slides_src)
-    return template.render(vars)
+def translate(src, title):
+    return template.render(slides=get_slides(src), title=title)
 
 def translate_file(src, dst):
-    d = translate(os.popen('markdown %s' % src).read().decode('utf-8'))
+    md = os.popen('markdown %s' % src).read().decode('utf-8')
+    html = translate(md, path.splitext(path.basename(src))[0])
     if dst != '-':
-        with open(dst, 'w') as fo: fo.write(d.encode('utf-8'))
-    else: print d
+        with open(dst, 'w') as fo: fo.write(html.encode('utf-8'))
+    else: print html
 
 def main():
     '''
-    -w: width
-    -h: height
-    -?: help
+    -t: title
+    -h: help
     '''
     global optdict
-    optl, args = getopt.getopt(sys.argv[1:], 'w:h:?')
+    optl, args = getopt.getopt(sys.argv[1:], 'ht:')
     optdict = dict(optl)
-    if '-?' in optdict or not args:
+    if '-h' in optdict or not args:
         exe = path.basename(sys.argv[0])
-        print '%s v1.0\nusage: %s [-h] [-w]' % (exe, exe)
+        print '%s v1.0\nusage: %s [-h] [-t]' % (exe, exe)
         print main.__doc__
         return
     output = path.splitext(args[0])[0] + '.html'

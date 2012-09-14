@@ -32,11 +32,11 @@ geted2k是一个用于获取和提交ed2k连接的程序，程序原本是为了
 
 # md2slide #
 
-This program is used to translate markdown file to html5 slide. It is based on html5-slides-markdown, thanks Adam Zapletal. This program is followed upstream, source is released by Apache License 2.0, please check source code for more infomation.
+This program is used to translate markdown file to html5 slide. It is based on [reveal](https://github.com/hakimel/reveal.js). This program is followed upstream, source is released by MIT lisence, please check source code for more infomation.
 
 # md2slide #
 
-程序可以将markdown文档转换为html5的演示文档。本程序是基于html5-slides-markdown项目修改的，感谢Adam Zapletal和他的工作。项目遵从上游授权，以Apache License 2.0发布，具体情况请阅读源码。
+程序可以将markdown文档转换为html5的演示文档。程序基于[reveal](https://github.com/hakimel/reveal.js)项目完成。项目遵从上游，以MIT授权发布。具体情况请阅读源码。
 
 # packpy #
 
