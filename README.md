@@ -65,3 +65,15 @@ Source is released by GPL, please check source code for more infomation.
 所有deb包必须放置在pool/<category>/下。category是仓库的分类名，例如stable, testing, unstable等。
 
 程序基于GPL开放源码，具体请查看文件。
+
+# service #
+
+This program is written by python, and used to manage linux sysv service. It help you to write a system service, or monitor other program to keep them running. init.d is example.
+
+Source is released by BSD, please check source code for more infomation.
+
+# service #
+
+这个项目用于管理linux下的sysv服务，基于python写成。可以很容易的编写一个系统服务，或是监控其他python程序的运行。init.d是样例。
+
+程序基于BSD开放源码，具体请查看文件。
