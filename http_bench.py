@@ -4,12 +4,12 @@
 @date: 2012-09-30
 @author: shell.xu
 '''
-import os, re, sys, time, subprocess
+import os, re, sys, time, getopt, subprocess
 from contextlib import contextmanager
 
 def read_table(s):
     for line in s:
-        if line.startswith(' '): continue
+        if line.startswith(' ') or line.startswith('WARNING:'): continue
         try: name, dt = line.strip().split(':', 1)
         except ValueError: break
         d = dt.split()
@@ -33,9 +33,9 @@ def run_ab(url, c, n):
             if m is None: continue
             yield k, [m.group(1),]
 
-def run_test(f, url, minc=50, maxc=1000, interval=0,
+def run_test(f, url, minc=50, maxc=1000, interval=None,
              times=10, minn=5000, maxn=20000):
-    if interval == 0: interval = minc
+    if interval is None: interval = minc
     r = {}
     for c in xrange(minc, maxc, interval):
         print 'concurrency: %d' % c
@@ -91,8 +91,8 @@ infod = {'rps': 'request per second',
          'tpr': 'time per request(ms)',
          'tr': 'data per second(MB/s)'}
 src = ['connect', 'processing', 'waiting', 'total']
-def show(dt):
-    g = Gnuplot('output.png')
+def show(dt, outfile):
+    g = Gnuplot(outfile)
 
     with g.multiplot(3, 2):
 
@@ -122,8 +122,22 @@ def show(dt):
     return g
 
 def main():
-    dt = run_test(run_ab, 'http://localhost/', maxc=4000)
-    show(dt).run()
+    '''
+    -h: help
+    -i: interval
+    -m: min concurrency
+    -M: max concurrency
+    -o: output filename
+    '''
+    optlist, args = getopt.getopt(sys.argv[1:], 'himMo')
+    optdict = dict(optlist)
+    if '-h' in optdict:
+        print '%s [-h] [-i interval] [-m min] [-M max] [-o output filename] url' % sys.argv[0]
+        print main.__doc__
+        return
+    dt = run_test(run_ab, args[0], minc=optdict.get('-m', 50),
+                  maxc=optdict.get('-M', 1000), interval=optdict.get('-i', None))
+    show(dt, optdict.get('-o', 'output.png')).run()
     os.system('display output.png')
 
 if __name__ == '__main__': main()
