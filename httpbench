@@ -4,7 +4,7 @@
 @date: 2012-09-30
 @author: shell.xu
 '''
-import os, re, sys, time, getopt, subprocess
+import os, re, sys, math, time, getopt, subprocess
 from contextlib import contextmanager
 
 def read_table(s):
@@ -21,8 +21,10 @@ dmap = {
     'tr': re.compile('Transfer rate:\s*([\d\.]+) \[.*\] received')}
 re_header = re.compile('([\d.]+) \[.*\] (.*)')
 def run_ab(url, c, n):
-    p = subprocess.Popen(['ab', '-c', str(c), '-n', str(n), url],
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    cmds = ['ab', '-q', '-r',]
+    if '-k' in optdict: cmds.append('-k')
+    cmds.extend(('-c', str(c), '-n', str(n), url))
+    p = subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     r = {}
     for line in p.stdout:
         for k, v in dmap.iteritems():
@@ -34,18 +36,20 @@ def run_ab(url, c, n):
             yield k, [m.group(1),]
 
 def run_test(f, url, minc=50, maxc=1000, interval=None,
-             times=10, minn=5000, maxn=20000):
+             times=633, minn=10000, maxn=40000, wait=10):
     if interval is None: interval = minc
     r = {}
     for c in xrange(minc, maxc, interval):
-        print 'concurrency: %d' % c
-        for name, value in f(url, c, max(c*times, minn)):
+        n = min(max(math.sqrt(c)*times, minn), maxn)
+        w = float(c)*wait/maxc
+        print 'concurrency: %d, count: %d, wait: %d' % (c, n, w)
+        for name, value in f(url, c, n):
             r.setdefault(name, [])
             try: r[name].append([c,] + map(float, value))
             except:
                 print name, value
                 raise
-        time.sleep(1)
+        time.sleep(w)
     return r
 
 class Gnuplot(object):
@@ -125,19 +129,26 @@ def main():
     '''
     -h: help
     -i: interval
+    -k: keep alive
     -m: min concurrency
     -M: max concurrency
     -o: output filename
+    -w: wait some seconds
     '''
-    optlist, args = getopt.getopt(sys.argv[1:], 'himMo')
+    global optdict
+    optlist, args = getopt.getopt(sys.argv[1:], 'hi:km:M:o:w:')
     optdict = dict(optlist)
     if '-h' in optdict:
-        print '%s [-h] [-i interval] [-m min] [-M max] [-o output filename] url' % sys.argv[0]
+        print '%s [-h] [-i interval] [-k] [-m min] [-M max] [-o filename] [-w seconds] url' % sys.argv[0]
         print main.__doc__
         return
-    dt = run_test(run_ab, args[0], minc=optdict.get('-m', 50),
-                  maxc=optdict.get('-M', 1000), interval=optdict.get('-i', None))
+    interval = optdict.get('-i', None)
+    if interval: interval = int(interval)
+    dt = run_test(run_ab, args[0],
+                  interval=interval,
+                  minc=int(optdict.get('-m', 50)),
+                  maxc=int(optdict.get('-M', 1000)),
+                  wait=int(optdict.get('-w', 1)))
     show(dt, optdict.get('-o', 'output.png')).run()
-    os.system('display output.png')
 
 if __name__ == '__main__': main()
