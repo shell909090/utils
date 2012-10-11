@@ -148,7 +148,7 @@ def main():
                   interval=interval,
                   minc=int(optdict.get('-m', 50)),
                   maxc=int(optdict.get('-M', 1000)),
-                  wait=int(optdict.get('-w', 1)))
+                  wait=int(optdict.get('-w', 10)))
     show(dt, optdict.get('-o', 'output.png')).run()
 
 if __name__ == '__main__': main()
