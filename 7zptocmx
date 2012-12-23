@@ -134,7 +134,7 @@ def main():
         print '%s v1.0\nusage: %s [-h] [-f] [-l] filename' % (exe, exe)
         print main.__doc__
         return
-    if '-l':
+    if '-l' in optdict:
         for arg in args:
             for i in check_dir(arg): print i
         return
