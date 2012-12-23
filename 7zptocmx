@@ -101,7 +101,7 @@ def trans_lz(filepath):
         decompress(fullpath, tmp)
         for base, dirs, files in os.walk(tmp):
             for f in files:
-                if path.splitext(f)[1].lower() == '.7z': lz_to_dir(base, f)
+                if path.splitext(f)[1].lower() == '.7z': lzip_to_dir(base, f)
         pic_to_jpg(tmp)
         zip_cmp(tmp, '%s-new.zip' % path.splitext(fullpath)[0])
     finally:
