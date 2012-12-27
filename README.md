@@ -10,6 +10,18 @@ Source is released by GPL, please check source code for more infomation.
 
 程序基于GPL开放源码，具体请查看文件。
 
+# ansi2html #
+
+This program translate ansi seqence to html, include escape seqence. So it designed to process the output of script.
+
+Source is released by GPL, please check source code for more infomation.
+
+# ansi2html #
+
+这个程序将ansi转换为html，包括ansi字符序列。因此他可以处理script的输出。
+
+程序基于GPL开放源码，具体请查看文件。
+
 # geted2k #
 
 geted2k is a program to fetch and commit ed2k link from a web page, this program is designed for verycd.com, but can also used to any web page.

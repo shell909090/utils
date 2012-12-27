@@ -1,0 +1,144 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+'''
+@date: 2012-12-27
+@author: shell.xu
+@license:
+    Copyright (C) 2012 Shell Xu
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
+import os, sys, getopt, logging
+from os import path
+
+fcolormap = {
+    30: 'black', 31: 'red', 32: 'green', 33: 'yellow',
+    34: 'blue', 35: 'magenta', 36: 'cyan', 37: 'white'}
+bcolormap = {
+    40: 'black', 41: 'red', 42: 'green', 43: 'yellow',
+    44: 'blue', 45: 'magenta', 46: 'cyan', 47: 'white'}
+htmlquota = {'&': '&amp;', ' ': '&nbsp;', '<': '&lt;', '>': '&gt;'}
+
+def read_until(stream, tester):
+    c = stream.read(1)
+    if not c: raise EOFError()
+    r = c
+    while tester(c):
+        c = stream.read(1)
+        if not c: raise EOFError()
+        r += c
+    return r
+
+def read_block(stream, end):
+    c = stream.read(1)
+    if not c: raise EOFError()
+    r = c
+    while not r.endswith(end):
+        c = stream.read(1)
+        if not c: raise EOFError()
+        r += c
+    return r
+
+def on_color(control, stream, rslt, ped):
+    colors = []
+    if control[:-1]: colors = [int(c) for c in control[:-1].split(';')]
+    if not colors or colors[0] == 0:
+        while ped: rslt.append(ped.pop(-1))
+    else:
+        r = []
+        for c in colors:
+            if c in fcolormap: r.append('color=%s' % fcolormap[c])
+            elif c in bcolormap: r.append('bgcolor=%s' % fcolormap[c])
+        rslt.append('<font %s>' % ' '.join(r))
+        ped.append('</font>')
+
+def translator(stream):
+    rslt, ped = [], []
+    try:
+        while True:
+            c = stream.read(1)
+            if not c: raise EOFError()
+            if c in htmlquota: rslt.append(htmlquota[c])
+            elif c == '\x07': pass
+            elif c == '\x08': rslt.pop(-1)
+            elif c == '\x0D':
+                stream.read(1)
+                while ped: rslt.append(ped.pop(-1))
+                rslt.append('<br/>\n')
+            elif c == '\x0A':
+                while ped: rslt.append(ped.pop(-1))
+                rslt.append('<br/>\n')
+            elif c == '\x1B':
+                c = stream.read(1)
+                if c == '[':
+                    control = read_until(stream, lambda c: not c.isalpha())
+                    if control[-1] == 'm':
+                        if '@' in control:
+                            logging.debug(control)
+                            continue
+                        on_color(control, stream, rslt, ped)
+                    elif control[-1] == 'h':
+                        logging.debug(control)
+                        if control == '?1049h': rslt.append('<div class="fullscreen">')
+                    elif control[-1] == 'l':
+                        logging.debug(control)
+                        if control == '?1049l': rslt.append('</div>')
+                    else: logging.debug(control)
+                elif c == ']':
+                    stream.read(2)
+                    read_block(stream, '\x07')
+                    rslt.append('<span class="input">')
+                    ped.append('</span>')
+            else: rslt.append(c)
+    except EOFError:
+        while ped: rslt.append(ped.pop(-1))
+    return ''.join(rslt)
+
+header = '''<html><head>
+<title>%s</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<style type="text/css">
+body {
+  color: white;
+  background: black;
+  margin: 0;
+  padding: 0;
+  font-family: monospace;
+  }
+span.input {
+  text-decoration: underline;
+}
+div.fullscreen {
+  display: none;
+}
+</style>
+</head><body>'''
+
+def main():
+    optlist, args = getopt.getopt(sys.argv[1:], 'ho:')
+    optdict = dict(optlist)
+    if '-h' in optdict:
+        print main.__doc__
+        return
+    title = 'ansi2html'
+    if args[0] != '-':
+        with open(args[0], 'rb') as fi: rslt = translator(fi)
+        title = path.splitext(path.basename(args[0]))[0]
+    else: rslt = translator(sys.stdin)
+    output = header % title + rslt + '</body></html>'
+    if '-o' in optdict:
+        with open(optdict['-o'], 'w') as fo: fo.write(output)
+    else: print output
+
+if __name__ == '__main__': main()
