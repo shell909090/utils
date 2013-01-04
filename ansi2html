@@ -59,7 +59,7 @@ def on_color(control, stream, rslt, ped):
         r = []
         for c in colors:
             if c in fcolormap: r.append('color=%s' % fcolormap[c])
-            elif c in bcolormap: r.append('bgcolor=%s' % fcolormap[c])
+            elif c in bcolormap: r.append('bgcolor=%s' % bcolormap[c])
         rslt.append('<font %s>' % ' '.join(r))
         ped.append('</font>')
 
