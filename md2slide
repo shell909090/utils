@@ -124,7 +124,7 @@ def translate(src, title):
     return template.render(slides=get_slides(src), title=title)
 
 def translate_file(src, dst):
-    md = os.popen('markdown %s' % src).read().decode('utf-8')
+    md = os.popen('markdown "%s"' % src).read().decode('utf-8')
     html = translate(md, path.splitext(path.basename(src))[0])
     if dst != '-':
         with open(dst, 'w') as fo: fo.write(html.encode('utf-8'))
