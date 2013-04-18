@@ -34,7 +34,7 @@ def cklevel(errors, attrs, name, b, lv):
     if n is None: return
     try: r = int(n.get('rawvalue').split()[0])
     except: r = 0
-    if r > b: errors.append('%s %s | value: %d, max: %d' % (lv, name, r, b))
+    if r > b: errors.append('%s %s value: %d, max: %d' % (lv, name, r, b))
 
 def chkdsk(driver):
     errors  = []
@@ -62,8 +62,12 @@ def chkdsk(driver):
     cklevel(errors, attrs, 'Head_Flying_Hours', 10000, 'WARNING')
     cklevel(errors, attrs, 'Head_Flying_Hours', 50000, 'WARNING')
 
+    for k, v in attrs.iteritems():
+        if int(v['value']) <= int(v['thresh']):
+            errors.append('CRITICAL %s: %d %d' % (k, int(v['value']), int(v['thresh'])))
+
     if len(errors) == 0:
-        info = []
+        info = ['%d test passed' % len(attrs),]
         if 'Power_On_Hours' in attrs:
             info.append('power on: %s hours' % attrs['Power_On_Hours']['rawvalue'])
         if 'Power_Cycle_Count' in attrs:
@@ -72,11 +76,12 @@ def chkdsk(driver):
             info.append('temp: %s C' % attrs['Temperature_Celsius']['rawvalue'])
         if 'Reallocated_Event_Count' in attrs:
             info.append('realloc: %s times' % attrs['Reallocated_Event_Count']['rawvalue'])
-        return 0, 'SMART OK: %s | %s.' % (driver, ', '.join(info))
+        return 0, 'SMART OK: %s | %s.' % (driver, '\n'.join(info))
+
     for e in errors:
         if e.startswith('CRITICAL'):
-            return 2, e
-    return 1, errors[0]
+            return 2, 'SMART CRITICAL: %s | %s ' % (driver, '\n'.join(errors))
+    return 1, 'SMART WARNING: %s | %s ' % (driver, '\n'.join(errors))
 
 def main():
     ''' smart_mon v1.0 (nagios-plugins)
