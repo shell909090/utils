@@ -1,0 +1,106 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+'''
+@date: 2013-04-17
+@author: shell.xu
+'''
+import os, sys, getopt, logging, subprocess
+from os import path
+
+def find_smartctl():
+    for p in ['/sbin', '/bin', '/usr/sbin', '/usr/bin/',
+              '/usr/local/sbin/', '/usr/local/bin']:
+        filepath = path.join(p, 'smartctl')
+        if path.exists(filepath): return filepath
+
+def call_smartctl(exepath, driver):
+    pipe = subprocess.Popen([exepath, '-a', driver], stdout=subprocess.PIPE).stdout
+    for line in pipe:
+        if line.startswith('SMART overall-health self-assessment test result'):
+            if line.split(':')[1].strip() != 'PASSED':
+                return 'overall test failed'
+        if line.find('ATTRIBUTE_NAME') != -1 and line.find('WHEN_FAILED') != -1: break
+    rslt = {}
+    for line in pipe:
+        line = line.strip()
+        if not line: break
+        r = line.split()
+        rslt[r[1]] = {'value': r[3], 'worst': r[4], 'thresh': r[5],
+                      'type': r[6], 'rawvalue': r[9]}
+    return rslt
+
+def cklevel(errors, attrs, name, b, lv):
+    n = attrs.get(name)
+    if n is None: return
+    try: r = int(n.get('rawvalue').split()[0])
+    except: r = 0
+    if r > b: errors.append('%s %s | value: %d, max: %d' % (lv, name, r, b))
+
+def chkdsk(driver):
+    errors  = []
+    attrs = call_smartctl(find_smartctl(), driver)
+    if isinstance(attrs, str): return 2, attrs
+
+    cklevel(errors, attrs, 'Raw_Read_Error_Rate', 1000, 'WARNING')
+    cklevel(errors, attrs, 'Start_Stop_Count', 10000, 'WARNING')
+    cklevel(errors, attrs, 'Reallocated_Sector_Ct', 100, 'WARNING')
+    cklevel(errors, attrs, 'Reallocated_Sector_Ct', 100000, 'CRITICAL')
+    cklevel(errors, attrs, 'Seek_Error_Rate', 1000, 'WARNING')
+    cklevel(errors, attrs, 'Power_On_Hours', 10000, 'WARNING')
+    cklevel(errors, attrs, 'Power_On_Hours', 50000, 'CRITICAL')
+    cklevel(errors, attrs, 'Spin_Retry_Count', 100, 'WARNING')
+    cklevel(errors, attrs, 'Spin_Retry_Count', 100000, 'CRITICAL')
+    cklevel(errors, attrs, 'Power_Cycle_Count', 10000, 'WARNING')
+    cklevel(errors, attrs, 'Command_Timeout', 100, 'WARNING')
+    cklevel(errors, attrs, 'Command_Timeout', 100000, 'CRITICAL')
+    cklevel(errors, attrs, 'Load_Cycle_Count', 300000, 'WARNING')
+    cklevel(errors, attrs, 'Load_Cycle_Count', 600000, 'WARNING')
+    cklevel(errors, attrs, 'Temperature_Celsius', 55, 'WARNING')
+    cklevel(errors, attrs, 'Temperature_Celsius', 65, 'CRITICAL')
+    cklevel(errors, attrs, 'Reallocated_Event_Count', 100, 'WARNING')
+    cklevel(errors, attrs, 'Reallocated_Event_Count', 100000, 'CRITICAL')
+    cklevel(errors, attrs, 'Head_Flying_Hours', 10000, 'WARNING')
+    cklevel(errors, attrs, 'Head_Flying_Hours', 50000, 'WARNING')
+
+    if len(errors) == 0:
+        info = []
+        if 'Power_On_Hours' in attrs:
+            info.append('power on: %s hours' % attrs['Power_On_Hours']['rawvalue'])
+        if 'Power_Cycle_Count' in attrs:
+            info.append('boot: %s times' % attrs['Power_Cycle_Count']['rawvalue'])
+        if 'Temperature_Celsius' in attrs:
+            info.append('temp: %s C' % attrs['Temperature_Celsius']['rawvalue'])
+        if 'Reallocated_Event_Count' in attrs:
+            info.append('realloc: %s times' % attrs['Reallocated_Event_Count']['rawvalue'])
+        return 0, 'SMART OK: %s | %s.' % (driver, ', '.join(info))
+    for e in errors:
+        if e.startswith('CRITICAL'):
+            return 2, e
+    return 1, errors[0]
+
+def main():
+    ''' smart_mon v1.0 (nagios-plugins)
+Copyright (c) 2013 Shell.Xu
+
+This plugin check S.M.A.R.T info.
+
+Usage:
+smart_mon /dev/sda
+    '''
+    optlist, args = getopt.getopt(sys.argv[1:], 'h')
+    optdict = dict(optlist)
+    if '-h' in optdict:
+        print main.__doc__
+        return 0
+    if len(args) == 0:
+        print 'no drive args'
+        return 0
+    lv, err = chkdsk(args[0])
+    print err
+    return lv
+
+if __name__ == '__main__':
+    try: sys.exit(main())
+    except Exception, err:
+        logging.exception(err)
+        sys.exit(3)
