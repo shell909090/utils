@@ -10,9 +10,11 @@ from os import path
 
 def rewrite(filepath, callback):
     filepath = path.expanduser(filepath)
-    with open(filepath) as fi: lines = fi.readlines()
+    try:
+        with open(filepath) as fi: lines = fi.readlines()
+    except (OSError, IOError): lines = []
     lines = callback(lines)
-    with open(filepath, 'w') as fo: fo.write(''.join(lines))
+    with open(filepath, 'w+') as fo: fo.write(''.join(lines))
 
 def setup(lines, s):
     flags = {}
@@ -27,7 +29,9 @@ def setup(lines, s):
 
 def apt_source():
     ''' auto setup apt source '''
-    with open('/etc/apt/sources.list', 'w') as fo:
+    for p in ['/etc/apt/sources.list', '/etc/apt/sources.list.d/debian.list']:
+        if path.exists(p): f = p
+    with open(f, 'w') as fo:
         fo.write('''# from init.py
 deb http://mirrors.ustc.edu.cn/debian/ wheezy main contrib non-free
 #deb http://mirrors.yun-idc.cn/debian/ wheezy main contrib non-free
@@ -54,10 +58,19 @@ def sshd_hostkey():
     for p in glob.glob('/etc/ssh/*host*'): os.remove(p)
     os.system('dpkg-reconfigure openssh-server')
 
+pubkeys = [
+    ('shell@debox', 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDDWECakpfuC1j/VbaAotYcfIuNFsw3MNH1epFfZRHfNMRfSblDdom22zOlLSe40qTJvcXGCGqGKKuL2TcYdlrCpAvIM9+xNxuPIJQbeZ4egmC0uCf/YiEuy6QeFb/c7/CQJ3qnhjUc7w65MvX7fwBFgKy6G0IZOOh5QD4cYZf2u1cAqAHxIWztdZfbTEpo9DHkYZlyd5QbhfnOqe4OGgTsXi2wMLeSWQGmRx59Tu1Rtds2HZZRt7dzgx6itR60M/GTa5IqTOeBPbYGgtoc4OAAeqtUqzYoN9EO/yjTzEzb4tKPku1juWvOc5sJtcLDGt4nM7jrCIsssm+1ODKGAhJf shell@debox')]
+def ssh_pubkey():
+    ''' deploy my ssh keys '''
+    def edit(lines): return setup(lines, pubkeys)
+    rewrite('~/.ssh/authorized_keys', edit)
+    os.chmod(path.expanduser('~/.ssh/authorized_keys'),
+             stat.S_IRUSR | stat.S_IWUSR)
+
 def sudo():
     ''' sudo username to setup user can sudo to root '''
     username = args.pop(1)
-    with open('/etc/sudoers.d/%s' % username, 'w') as fo:
+    with open('/etc/sudoers.d/%s' % username, 'w+') as fo:
         fo.write('%s   ALL=(ALL) NOPASSWD: ALL' % username)
     os.chmod('/etc/sudoers.d/%s' % username, stat.S_IRUSR)
 
@@ -88,7 +101,7 @@ def ip6tables():
 
 def sysctl():
     ''' setup sysctl. '''
-    with open('/etc/sysctl.d/net.conf', 'w') as fo:
+    with open('/etc/sysctl.d/net.conf', 'w+') as fo:
         fo.write('net.ipv4.tcp_congestion_control = htcp')
     os.system('sysctl -p /etc/sysctl.d/net.conf')
 
@@ -118,10 +131,12 @@ def user():
                 ('DEBFULLNAME', 'export DEBFULLNAME="Shell Xu"')])
     rewrite('~/.bashrc', edit)
 
-cmds = set(['apt_source', 'apt_install', 'sshd', 'sshd_hostkey', 'sudo',
-            'iptables', 'ip6tables', 'sysctl', 'service', 'shelllink', 'user'])
-default_args = ['apt_source', 'apt_install', 'sshd', 'sshd_hostkey', 'sudo', 'shell'
-                'iptables', 'ip6tables', 'sysctl', 'service', 'shelllink', 'user']
+cmds = set(['apt_source', 'apt_install', 'sshd', 'sshd_hostkey',
+            'ssh_pubkey', 'sudo', 'iptables', 'ip6tables',
+            'sysctl', 'service', 'shelllink', 'user'])
+default_args = [
+    'apt_source', 'apt_install', 'sshd', 'sshd_hostkey', 'ssh_pubkey', 'sudo',
+    'shell', 'iptables', 'ip6tables', 'sysctl', 'service', 'shelllink', 'user']
 def main():
     '''init tool v1.0 written by Shell.Xu.
     -a: do all commands
