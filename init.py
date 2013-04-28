@@ -40,9 +40,7 @@ def apt_install():
     os.system('aptitude install %s' % ' '.join(pkglist))
 
 def sshd():
-    ''' '''
-    for p in glob.glob('/etc/ssh/*host*'): os.remove(p)
-    os.system('dpkg-reconfigure openssh-server')
+    ''' setup sshd '''
     os.system('aptitude install denyhosts')
     def edit(lines):
         return setup(lines, [
@@ -51,17 +49,24 @@ def sshd():
                 ('UseDNS', 'UseDNS no')])
     rewrite('/etc/ssh/sshd_config', edit)
 
+def sshd_hostkey():
+    ''' reset host key of ssh server '''
+    for p in glob.glob('/etc/ssh/*host*'): os.remove(p)
+    os.system('dpkg-reconfigure openssh-server')
+
 def sudo():
-    ''' use -u to identity username, shell as default '''
-    username = optdict.get('-u', 'shell')
+    ''' sudo username to setup user can sudo to root '''
+    username = args.pop(1)
     with open('/etc/sudoers.d/%s' % username, 'w') as fo:
         fo.write('%s   ALL=(ALL) NOPASSWD: ALL' % username)
     os.chmod('/etc/sudoers.d/%s' % username, stat.S_IRUSR)
 
 def ipXtables(name, cmd, tgtfile):
     accept_ports = raw_input('accept ports for %s (split by semicomma) [22]: ' % name)
+    if not accept_ports: accept_ports = '22'
     if '-p' not in optdict: do = os.system
     else: do = lambda x: sys.stdout.write(x+'\n')
+    do('/etc/init.d/iptables-persistent flush')
     do('%s -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT' % cmd)
     do('%s -A INPUT -i lo -j ACCEPT' % cmd)
     for p in accept_ports.split(';'):
@@ -71,14 +76,14 @@ def ipXtables(name, cmd, tgtfile):
     do('%s -P INPUT DROP' % cmd)
     if '-p' not in optdict:
         do('%s-save > %s' % (cmd, tgtfile))
-        do('/etc/init.d/iptables-persistent restart')
+    do('/etc/init.d/iptables-persistent restart')
 
 def iptables():
-    ''' auto setup iptables, use -p to print out, not write to target file. '''
+    ''' auto setup iptables, use -p to print out. '''
     ipXtables('ipv4', 'iptables', '/etc/iptables/rules.v4')
 
 def ip6tables():
-    ''' auto setup iptables for ipv6, use -p to print out, not write to target file. '''
+    ''' auto setup iptables for ipv6, use -p to print out. '''
     ipXtables('ipv6', 'ip6tables', '/etc/iptables/rules.v6')
 
 def sysctl():
@@ -97,44 +102,47 @@ def shelllink():
     ''' link /bin/sh to bash. '''
     os.system('ln -sf bash /bin/sh')
 
+envpath = ['/usr/local/sbin', '/usr/local/bin', '/usr/sbin',
+           '/usr/bin', '/sbin', '/bin', '~/bin']
 def user():
     ''' setup user environment. '''
     def edit(lines):
-        for i, l in enumerate(lines):
-            if not l.startswith('#'): break
-        lines.insert(
-            i, 'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:~/bin"\n')
+        editor = raw_input('editor [vim]: ')
+        if not any([l.find('PATH') != -1 for l in lines]):
+            for i, l in enumerate(lines):
+                if not l.startswith('#'): break
+            lines.insert(i, 'PATH="%s"\n' % ':'.join(envpath))
         return setup(lines, [
-                ('EDITOR', 'export EDITOR=vim'),
+                ('EDITOR', 'export EDITOR=%s' % editor),
                 ('DEBEMAIL', 'export DEBEMAIL=shell909090@gmail.com'),
-                ('DEBFULLNAME', 'export DEBFULLNAME="Shell Xu"'),
-                ])
-    return rewrite('~/.bashrc', edit)
+                ('DEBFULLNAME', 'export DEBFULLNAME="Shell Xu"')])
+    rewrite('~/.bashrc', edit)
 
-cmds = ['apt_source', 'apt_install', 'sshd', 'sudo', 'iptables',
-        'ip6tables', 'sysctl', 'service', 'shelllink', 'user']
+cmds = set(['apt_source', 'apt_install', 'sshd', 'sshd_hostkey', 'sudo',
+            'iptables', 'ip6tables', 'sysctl', 'service', 'shelllink', 'user'])
+default_args = ['apt_source', 'apt_install', 'sshd', 'sshd_hostkey', 'sudo', 'shell'
+                'iptables', 'ip6tables', 'sysctl', 'service', 'shelllink', 'user']
 def main():
     '''init tool v1.0 written by Shell.Xu.
     -a: do all commands
     -h: help
+    -p: print mode in iptables and ip6tables.
     -u: username
 commands:'''
     global optdict
+    global args
     optlist, args = getopt.getopt(sys.argv[1:], 'ahpu:')
     optdict = dict(optlist)
 
-    if '-a' in optdict: args = cmds
+    if '-a' in optdict: args = default_args
     if '-h' in optdict or not args:
         print main.__doc__
-        for c in cmds:
+        for c in sorted(cmds):
             print '    %s:%s' % (c, globals().get(c).__doc__)
         return
-        
-    for a in args:
-        if a not in cmds:
-            print '%s can\'t be recognized.' % a
-            continue
-        f = globals().get(a, None)
-        if f: f()
+
+    while args:
+        if args[0] in cmds: globals().get(args.pop(0))()
+        else: print '%s can\'t be recognized.' % args.pop(0)
 
 if __name__ == '__main__': main()
