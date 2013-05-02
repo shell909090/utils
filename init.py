@@ -27,9 +27,18 @@ def setup(lines, s):
         if not flags.get(k): lines.append(v + '\n')
     return lines
 
+envcfg = {}
+
+def getenv(name, prompt):
+    dft = envcfg.get(name)
+    return raw_input(prompt % dft) or dft
+
 #
 # system commands begin
 #
+
+def initenv(args):
+    pass
 
 debian_release = 'wheezy'
 apt_src = [
@@ -129,21 +138,25 @@ default_args = [
 # user commands begin
 #
 
+def user_initenv(args):
+    if not (set(args) & set(['user', 'git_config'])): return
+    envcfg['name'] = raw_input('name: ')
+    envcfg['email'] = raw_input('email: ')
+    envcfg['editor'] = raw_input('editor [vim]: ')  or 'vim'
+
 envpath = ['/usr/local/sbin', '/usr/local/bin', '/usr/sbin',
            '/usr/bin', '/sbin', '/bin', '~/bin']
 def user():
     ''' setup user environment. '''
     def edit(lines):
-        editor = raw_input('editor [vim]: ')
-        if not editor: editor = 'vim'
         if not any([l.find('PATH') != -1 for l in lines]):
             for i, l in enumerate(lines):
                 if not l.startswith('#'): break
             lines.insert(i, 'PATH="%s"\n' % ':'.join(envpath))
         return setup(lines, [
-                ('EDITOR', 'export EDITOR=%s' % editor),
-                ('DEBEMAIL', 'export DEBEMAIL=shell909090@gmail.com'),
-                ('DEBFULLNAME', 'export DEBFULLNAME="Shell Xu"')])
+                ('EDITOR', 'export EDITOR=%s' % getenv('editor', 'editor [%s]: ')),
+                ('DEBEMAIL', 'export DEBEMAIL=%s' % getenv('email', 'debemail [%s]: ')),
+                ('DEBFULLNAME', 'export DEBFULLNAME="%s"' % getenv('name', 'debname [%s]: '))])
     rewrite('~/.bashrc', edit)
 
 pubkeys = [
@@ -163,7 +176,7 @@ ssh_cfg = {
     'ForwardAgent': 'ForwardAgent\t\tyes'}
 def ssh_config():
     ''' setup ssh client config '''
-    ans1 = raw_input('will u use ControlMaster? [no] ')
+    ans1 = raw_input('will you use ControlMaster[no]? ')
     if not ans1: ans1 = 'no'
     if ans1.lower().startswith('y'):
         for name in ['ControlMaster', 'ControlPath', 'ControlPersist']:
@@ -189,12 +202,11 @@ gitcfg = '''[user]
         ci = commit'''
 def git_config():
     ''' setup git config '''
-    name = raw_input('git name: ')
-    email = raw_input('git email: ')
-    editor = raw_input('editor [vim]: ')
-    if not editor: editor = 'vim'
     with open(path.expanduser('~/.gitconfig'), 'w') as fo:
-        fo.write(gitcfg % (name, email, editor))
+        fo.write(gitcfg % (
+                getenv('name', 'git name [%s]: '),
+                getenv('email', 'git email [%s]: '),
+                getenv('editor', 'git editor [%s]: ')))
 
 def emacs():
     ''' download and setup emacs '''
@@ -208,7 +220,8 @@ def emacs():
 
 user_cmds = set(['user', 'ssh_pubkey', 'ssh_config', 'git_config', 'emacs'])
 user_default_args = ['user', 'ssh_pubkey', 'ssh_config', 'git_config', 'emacs']
-if os.getuid() != 0: cmds, default_args = user_cmds, user_default_args
+if os.getuid() != 0:
+    cmds, default_args, initenv = user_cmds, user_default_args, user_initenv
 
 def main():
     '''init tool v1.0 written by Shell.Xu.
@@ -229,6 +242,7 @@ commands:'''
             print '    %s:%s' % (c, globals().get(c).__doc__)
         return
 
+    if args: initenv(args)
     while args:
         if args[0] in cmds: globals().get(args.pop(0))()
         else: print '%s can\'t be recognized.' % args.pop(0)
