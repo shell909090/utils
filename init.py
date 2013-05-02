@@ -27,23 +27,35 @@ def setup(lines, s):
         if not flags.get(k): lines.append(v + '\n')
     return lines
 
+#
+# system commands begin
+#
+
+debian_release = 'wheezy'
+apt_src = [
+    'http://mirrors.ustc.edu.cn/debian/',
+    'http://mirrors.yun-idc.cn/debian/',
+    'http://localhost:9999/debian/',
+    'http://srv/debian/']
 def apt_source():
     ''' auto setup apt source '''
     for p in ['/etc/apt/sources.list', '/etc/apt/sources.list.d/debian.list']:
         if path.exists(p): f = p
-    with open(f, 'w') as fo:
-        fo.write('''# from init.py
-deb http://mirrors.ustc.edu.cn/debian/ wheezy main contrib non-free
-#deb http://mirrors.yun-idc.cn/debian/ wheezy main contrib non-free
-#deb http://localhost:9999/debian/ wheezy main contrib non-free''')
+    for i, l in enumerate(apt_src): print i + 1, l
+    chooses = [int(i.strip()) for i in raw_input('choose> ').split(',')]
+    s = ['%sdeb %s %s main contrib non-free' % (
+            '' if i+1 in chooses else '# ', l.strip(), debian_release)
+         for i, l in enumerate(apt_src)]
+    with open(f, 'w') as fo: fo.write('# from init.py\n' + '\n'.join(s))
+    os.system('aptitude update')
 
 def apt_install():
     ''' auto install packages '''
-    pkglist = ['less', 'vim', 'mtr-tiny', 'sysv-rc-conf', 'ifstat', 'iftop',
-               'iptables-persistent', 'sysv-rc-conf']
-    os.system('aptitude install %s' % ' '.join(pkglist))
+    os.system('aptitude install %s' % ' '.join([
+                'less', 'vim', 'mtr-tiny', 'sysv-rc-conf',
+                'ifstat', 'iftop', 'sysv-rc-conf']))
 
-def sshd():
+def sshd_config():
     ''' setup sshd '''
     os.system('aptitude install denyhosts')
     def edit(lines):
@@ -58,15 +70,6 @@ def sshd_hostkey():
     for p in glob.glob('/etc/ssh/*host*'): os.remove(p)
     os.system('dpkg-reconfigure openssh-server')
 
-pubkeys = [
-    ('shell@debox', 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDDWECakpfuC1j/VbaAotYcfIuNFsw3MNH1epFfZRHfNMRfSblDdom22zOlLSe40qTJvcXGCGqGKKuL2TcYdlrCpAvIM9+xNxuPIJQbeZ4egmC0uCf/YiEuy6QeFb/c7/CQJ3qnhjUc7w65MvX7fwBFgKy6G0IZOOh5QD4cYZf2u1cAqAHxIWztdZfbTEpo9DHkYZlyd5QbhfnOqe4OGgTsXi2wMLeSWQGmRx59Tu1Rtds2HZZRt7dzgx6itR60M/GTa5IqTOeBPbYGgtoc4OAAeqtUqzYoN9EO/yjTzEzb4tKPku1juWvOc5sJtcLDGt4nM7jrCIsssm+1ODKGAhJf shell@debox')]
-def ssh_pubkey():
-    ''' deploy my ssh keys '''
-    def edit(lines): return setup(lines, pubkeys)
-    rewrite('~/.ssh/authorized_keys', edit)
-    os.chmod(path.expanduser('~/.ssh/authorized_keys'),
-             stat.S_IRUSR | stat.S_IWUSR)
-
 def sudo():
     ''' sudo username to setup user can sudo to root '''
     username = args.pop(1)
@@ -75,6 +78,7 @@ def sudo():
     os.chmod('/etc/sudoers.d/%s' % username, stat.S_IRUSR)
 
 def ipXtables(name, cmd, tgtfile):
+    os.system('aptitude install iptables-persistent')
     accept_ports = raw_input('accept ports for %s (split by semicomma) [22]: ' % name)
     if not accept_ports: accept_ports = '22'
     if '-p' not in optdict: do = os.system
@@ -115,12 +119,23 @@ def shelllink():
     ''' link /bin/sh to bash. '''
     os.system('ln -sf bash /bin/sh')
 
+cmds = set(['apt_source', 'apt_install', 'sshd_config', 'sshd_hostkey',
+            'sudo', 'iptables', 'ip6tables', 'sysctl', 'service', 'shelllink'])
+default_args = [
+    'apt_source', 'apt_install', 'sshd_config', 'sshd_hostkey', 'sudo',
+    'shell', 'iptables', 'ip6tables', 'sysctl', 'service', 'shelllink']
+
+#
+# user commands begin
+#
+
 envpath = ['/usr/local/sbin', '/usr/local/bin', '/usr/sbin',
            '/usr/bin', '/sbin', '/bin', '~/bin']
 def user():
     ''' setup user environment. '''
     def edit(lines):
         editor = raw_input('editor [vim]: ')
+        if not editor: editor = 'vim'
         if not any([l.find('PATH') != -1 for l in lines]):
             for i, l in enumerate(lines):
                 if not l.startswith('#'): break
@@ -131,12 +146,70 @@ def user():
                 ('DEBFULLNAME', 'export DEBFULLNAME="Shell Xu"')])
     rewrite('~/.bashrc', edit)
 
-cmds = set(['apt_source', 'apt_install', 'sshd', 'sshd_hostkey',
-            'ssh_pubkey', 'sudo', 'iptables', 'ip6tables',
-            'sysctl', 'service', 'shelllink', 'user'])
-default_args = [
-    'apt_source', 'apt_install', 'sshd', 'sshd_hostkey', 'ssh_pubkey', 'sudo',
-    'shell', 'iptables', 'ip6tables', 'sysctl', 'service', 'shelllink', 'user']
+pubkeys = [
+    ('shell@debox', 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDDWECakpfuC1j/VbaAotYcfIuNFsw3MNH1epFfZRHfNMRfSblDdom22zOlLSe40qTJvcXGCGqGKKuL2TcYdlrCpAvIM9+xNxuPIJQbeZ4egmC0uCf/YiEuy6QeFb/c7/CQJ3qnhjUc7w65MvX7fwBFgKy6G0IZOOh5QD4cYZf2u1cAqAHxIWztdZfbTEpo9DHkYZlyd5QbhfnOqe4OGgTsXi2wMLeSWQGmRx59Tu1Rtds2HZZRt7dzgx6itR60M/GTa5IqTOeBPbYGgtoc4OAAeqtUqzYoN9EO/yjTzEzb4tKPku1juWvOc5sJtcLDGt4nM7jrCIsssm+1ODKGAhJf shell@debox')]
+def ssh_pubkey():
+    ''' deploy my ssh keys '''
+    def edit(lines): return setup(lines, pubkeys)
+    rewrite('~/.ssh/authorized_keys', edit)
+    os.chmod(path.expanduser('~/.ssh/authorized_keys'),
+             stat.S_IRUSR | stat.S_IWUSR)
+
+ssh_cfg = {
+    'ControlMaster': '# ControlMaster\t\tauto',
+    'ControlPath': '# ControlPath\t\t/tmp/ssh_mux_%h_%p_%r',
+    'ControlPersist': '# ControlPersist\t10m',
+    'ServerAliveInterval': 'ServerAliveInterval\t30',
+    'ForwardAgent': 'ForwardAgent\t\tyes'}
+def ssh_config():
+    ''' setup ssh client config '''
+    ans1 = raw_input('will u use ControlMaster? [no] ')
+    if not ans1: ans1 = 'no'
+    if ans1.lower().startswith('y'):
+        for name in ['ControlMaster', 'ControlPath', 'ControlPersist']:
+            ssh_cfg[name] = ssh_cfg[name].strip(' #')
+    def edit(lines): return setup(lines, ssh_cfg.items())
+    rewrite('~/.ssh/config', edit)
+
+gitcfg = '''[user]
+        name = %s
+        email = %s
+[core]
+        editor = %s
+[merge]
+        tool = meld
+[color]
+        ui = auto
+[alias]
+        s = status
+        st = status
+        d = diff
+        br = branch
+        co = checkout
+        ci = commit'''
+def git_config():
+    ''' setup git config '''
+    name = raw_input('git name: ')
+    email = raw_input('git email: ')
+    editor = raw_input('editor [vim]: ')
+    if not editor: editor = 'vim'
+    with open(path.expanduser('~/.gitconfig'), 'w') as fo:
+        fo.write(gitcfg % (name, email, editor))
+
+def emacs():
+    ''' download and setup emacs '''
+    if path.exists(path.expanduser('~/.emacs.d')): return
+    os.system('aptitude install %s' % ' '.join([
+                'git', 'make', 'emacs', 'auto-complete-el',
+                'dictionary-el', 'emacs-goodies-el', 'color-theme',
+                'magit', 'php-elisp', 'slime']))
+    os.system('git clone git://github.com/shell909090/emacscfg.git ~/.emacs.d')
+    os.system('make -C ~/.emacs.d install')
+
+user_cmds = set(['user', 'ssh_pubkey', 'ssh_config', 'git_config', 'emacs'])
+user_default_args = ['user', 'ssh_pubkey', 'ssh_config', 'git_config', 'emacs']
+if os.getuid() != 0: cmds, default_args = user_cmds, user_default_args
+
 def main():
     '''init tool v1.0 written by Shell.Xu.
     -a: do all commands
