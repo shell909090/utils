@@ -40,7 +40,7 @@ def getenv(name, prompt):
 def initenv(args):
     pass
 
-debian_release = 'wheezy'
+debian_release = 'jessie'
 apt_src = [
     'http://mirrors.ustc.edu.cn/debian/',
     'http://mirrors.yun-idc.cn/debian/',
