@@ -81,7 +81,8 @@ def sshd_hostkey():
 
 def sudo():
     ''' sudo username to setup user can sudo to root '''
-    username = args.pop(1)
+    os.system('aptitude install sudo')
+    username = optdict.get('-u')
     with open('/etc/sudoers.d/%s' % username, 'w+') as fo:
         fo.write('%s   ALL=(ALL) NOPASSWD: ALL' % username)
     os.chmod('/etc/sudoers.d/%s' % username, stat.S_IRUSR)
