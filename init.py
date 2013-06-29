@@ -43,7 +43,7 @@ def initenv(args):
 debian_release = 'jessie'
 apt_src = [
     'http://mirrors.ustc.edu.cn/debian/',
-    'http://mirrors.yun-idc.cn/debian/',
+    'http://mirrors.yun-idc.com/debian/',
     'http://localhost:9999/debian/',
     'http://srv/debian/']
 def apt_source():
