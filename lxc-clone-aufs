@@ -261,11 +261,8 @@ else
         frozen=1
     fi
     mkdir -p $rootfs/ $rootfs.w/
-    if grep "aufs" $lxc_path/$lxc_new/fstab >/dev/null 2>&1; then
-	mount -t aufs -o br=$rootfs.w/=rw:$oldroot/=r none $rootfs/
-    else
-	sed -i "1inone $rootfs/ aufs defaults,br=$rootfs.w/=rw:$oldroot/=r 0 0" $lxc_path/$lxc_new/fstab;
-    fi
+    sed -i "1inone $rootfs/ aufs defaults,br=$rootfs.w/=rw:$oldroot/=r 0 0" $lxc_path/$lxc_new/fstab;
+    mount -t aufs -o br=$rootfs.w/=rw:$oldroot/=r none $rootfs/
     mounted=1
     echo "lxc.rootfs = $rootfs" >> $lxc_path/$lxc_new/config
     if [ $container_running = "True" ]; then
