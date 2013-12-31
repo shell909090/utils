@@ -19,59 +19,54 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 import os, sys, base64, getopt, urllib, urllib2, getpass
-from os import path
-
-def geturl(url, username=None, password=None):
-    request = urllib2.Request(url)
-    if username and password:
-        b64str = base64.encodestring('%s:%s' % (username, password))
-        request.add_header("Authorization",
-                           "Basic %s" % b64str.replace('\n', ''))
-    return urllib2.urlopen(request).read()
-
-def getlist(url):
-    return os.popen('lynx --dump --listonly --nonumbers %s' % url)
-
-def filter_ed2k(s):
-    for i in s:
-        if i.startswith('ed2k'): yield i.strip()
+from BeautifulSoup import BeautifulSoup
 
 def commit_mldonkey(ed2k):
     try:
-        geturl("http://localhost:4080/submit?q=dllink+%s" % urllib.quote(ed2k),
-               optdict['-u'], optdict['password'])
+        req = urllib2.Request(
+            "http://localhost:4080/submit?q=dllink+%s" % urllib.quote(ed2k))
+        username, password = optdict['-u'], optdict['password']
+        if username and password:
+            b64str = base64.encodestring('%s:%s' % (username, password))
+            req.add_header("Authorization", "Basic %s" % b64str.replace('\n', ''))
+        urllib2.urlopen(req).read()
         return True
     except: return False
 
-def proced2k(ed2k):
-    if ed2k.startswith('ed2k://|subscribe|'): return
-    if '-c' in optdict: commit_mldonkey(ed2k)
-    if '-r' not in optdict: ed2k = urllib.unquote(ed2k)
-    print ed2k
+def getlist(url):
+    doc = BeautifulSoup(urllib.urlopen(url).read())
+    for a in doc.findAll('a'):
+        if u'href' not in dict(a.attrs): continue
+        yield a['href']
+
+def filter_ed2k(s):
+    for a in s:
+        if not a.startswith('ed2k'): continue
+        if a.startswith('ed2k://|subscribe|'): continue
+        yield i.strip()
 
 def main():
-    '''
+    '''geted2k v1.0\nusage: geted2k [-h] [-u username] [-c] [-r] url
     -c: commit
     -h: help
     -r: raw mode
     -u: username
-    if the argument is -, ed2k list will be read from stdin
-    and do like download from net.
     '''
     global optdict
     optlist, args = getopt.getopt(sys.argv[1:], 'chru:')
     optdict = dict(optlist)
     if '-h' in optdict or not args:
-        exe = path.basename(sys.argv[0])
-        print '%s v1.0\nusage: %s [-h] [-u username] [-c] [-r] url' % (exe, exe)
         print main.__doc__
         return
+
     if '-u' in optdict:
         optdict['password'] = getpass.getpass('password[%s]: ' % optdict['-u'])
-    if len(args) == 1 and args[0] == '-':
-        for line in sys.stdin: proced2k(line.strip())
-        return
+
     for url in args:
-        for ed2k in filter_ed2k(getlist(url)): proced2k(ed2k)
+        for ed2k in filter_ed2k(getlist(url)):
+            ed2k = ed2k.encode('utf-8')
+            if '-c' in optdict: commit_mldonkey(ed2k)
+            if '-r' not in optdict: ed2k = urllib.unquote(ed2k)
+            print ed2k
 
 if __name__ == '__main__': main()
