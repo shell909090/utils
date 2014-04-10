@@ -43,7 +43,7 @@ def filter_ed2k(s):
     for a in s:
         if not a.startswith('ed2k'): continue
         if a.startswith('ed2k://|subscribe|'): continue
-        yield i.strip()
+        yield a.strip()
 
 def main():
     '''geted2k v1.0\nusage: geted2k [-h] [-u username] [-c] [-r] url
