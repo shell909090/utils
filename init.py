@@ -116,7 +116,15 @@ def ip6tables():
 def sysctl():
     ''' setup sysctl. '''
     with open('/etc/sysctl.d/net.conf', 'w+') as fo:
-        fo.write('net.ipv4.tcp_congestion_control = htcp')
+        fo.write('''net.ipv4.tcp_congestion_control = htcp
+
+net.core.rmem_default = 2621440
+net.core.rmem_max = 16777216
+net.core.wmem_default = 655360
+net.core.wmem_max = 16777216
+net.ipv4.tcp_mem = 4096		2621440	16777216
+net.ipv4.tcp_rmem = 4096	2621440	16777216
+net.ipv4.tcp_wmem = 4096	655360	16777216''')
     os.system('sysctl -p /etc/sysctl.d/net.conf')
 
 def service():
