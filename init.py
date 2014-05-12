@@ -66,7 +66,6 @@ def apt_install():
 
 def sshd_config():
     ''' setup sshd '''
-    os.system('aptitude install denyhosts')
     def edit(lines):
         return setup(lines, [
                 ('PasswordAuthentication', 'PasswordAuthentication no'),
@@ -74,18 +73,14 @@ def sshd_config():
                 ('UseDNS', 'UseDNS no')])
     rewrite('/etc/ssh/sshd_config', edit)
 
+def sshd_denyhosts():
+    ''' setup denyhosts '''
+    os.system('aptitude install denyhosts')
+
 def sshd_hostkey():
     ''' reset host key of ssh server '''
     for p in glob.glob('/etc/ssh/*host*'): os.remove(p)
     os.system('dpkg-reconfigure openssh-server')
-
-def sudo():
-    ''' sudo username to setup user can sudo to root '''
-    os.system('aptitude install sudo')
-    username = optdict.get('-u')
-    with open('/etc/sudoers.d/%s' % username, 'w+') as fo:
-        fo.write('%s   ALL=(ALL) NOPASSWD: ALL' % username)
-    os.chmod('/etc/sudoers.d/%s' % username, stat.S_IRUSR)
 
 def ipXtables(name, cmd, tgtfile):
     os.system('aptitude install iptables-persistent')
@@ -122,7 +117,6 @@ net.core.rmem_default = 2621440
 net.core.rmem_max = 16777216
 net.core.wmem_default = 655360
 net.core.wmem_max = 16777216
-net.ipv4.tcp_mem = 4096		2621440	16777216
 net.ipv4.tcp_rmem = 4096	2621440	16777216
 net.ipv4.tcp_wmem = 4096	655360	16777216''')
     os.system('sysctl -p /etc/sysctl.d/net.conf')
@@ -137,10 +131,10 @@ def shelllink():
     ''' link /bin/sh to bash. '''
     os.system('ln -sf bash /bin/sh')
 
-cmds = set(['apt_source', 'apt_install', 'sshd_config', 'sshd_hostkey',
+cmds = set(['apt_source', 'apt_install', 'sshd_config', 'sshd_denyhosts', 'sshd_hostkey',
             'sudo', 'iptables', 'ip6tables', 'sysctl', 'service', 'shelllink'])
 default_args = [
-    'apt_source', 'apt_install', 'sshd_config', 'sshd_hostkey', 'sudo',
+    'apt_source', 'apt_install', 'sshd_config', 'sshd_denyhosts', 'sshd_hostkey', 'sudo',
     'shell', 'iptables', 'ip6tables', 'sysctl', 'service', 'shelllink']
 
 #
