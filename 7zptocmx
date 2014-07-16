@@ -4,20 +4,28 @@
 @date: 2010-06-07
 @author: shell.xu
 @license:
-    Copyright (C) 2012 Shell Xu
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+Copyright (C) 2012 Shell Xu
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+ any later version.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+@comment:
+
+This program can translate all kind of package to standard comic package, jpeg image format, zip package. It support rar, zip, 7z, and support 7z file in rar file.
+
+这个程序是用于将各种格式的压缩文件转换为标准的压缩文件，zip压缩，jpeg格式。支持的格式有rar，zip，7z。包括压缩包内嵌套7z。
+
 '''
 import os, sys, shutil, getopt, zipfile, tempfile
 from os import path

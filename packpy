@@ -3,20 +3,28 @@
 @date: 2012-05-12
 @author: shell.xu
 @license:
-    Copyright (C) 2012 Shell Xu
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+Copyright (C) 2012 Shell Xu
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+@comment:
+
+This program is used to compress python source code to unreadable base64 code, and keep it runable. It will help to reduce size, or translate thought email, or other media which will loss format.
+
+该程序是通过压缩和重编码的方式，将普通的python源码混淆成一行流风格。这样有利于减小大小，或者在邮件等可能去除格式的介质中传输。
+
 '''
 import re, sys, zlib, base64, getopt
 from os import path

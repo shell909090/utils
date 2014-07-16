@@ -4,20 +4,32 @@
 @date: 2011-02-28
 @author: shell.xu
 @license:
-    Copyright (C) 2012 Shell Xu
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+Copyright (C) 2012 Shell Xu
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+@comment:
+
+This program is used to scan deb pool, make dists directory. That make deb pool can be publish as a apt repository.
+
+All deb package must be put into pool/<category>. Category is classify name of repository, for example, stable/testing/unstable.
+
+该程序用于对deb包池进行扫描，生成dists目录。这样获得的目录可以用于apt更新发布。
+
+所有deb包必须放置在pool/<category>/下。category是仓库的分类名，例如stable, testing, unstable等。
+
 '''
 import os
 import sys

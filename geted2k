@@ -3,20 +3,36 @@
 @date: 2012-05-12
 @author: shell.xu
 @license:
-    Copyright (C) 2012 Shell Xu
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+Copyright (C) 2012 Shell Xu
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+@comment:
+
+geted2k is a program to fetch and commit ed2k link from a web page, this program is designed for verycd.com, but can also used to any web page.
+
+It can get all ed2k link from page, print them, or commit to mldonkey. If you need to commit to mldonkey, please make sure that mldonkey is run in localhost and http port is open. Else you need to modify source code.
+
+It is dependence on lynx, so make sure you already installed.
+
+geted2k是一个用于获取和提交ed2k连接的程序，程序原本是为了从verycd.com上面抓一些ed2k的链接而写的，其实也可以用于其他站点。
+
+程序可以从指定页面上获得成百的ed2k://连接，打印出来，或者直接提交到mldonkey的下载里面（需要mldonkey的用户名和密码，并且mldonkey要在本机直接运行，开放http管理，否则需要适当修改源码）。
+
+项目依赖于lynx，请确认在使用前安装。
+
 '''
 import os, sys, base64, getopt, urllib, urllib2, getpass
 from BeautifulSoup import BeautifulSoup
