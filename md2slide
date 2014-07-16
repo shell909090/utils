@@ -37,9 +37,8 @@ from mako.template import Template
 from BeautifulSoup import BeautifulSoup
 from os import path
 
-# http://xuzhixiang.u.qiniudn.com/reveal
 # http://cdn.bootcss.com/reveal.js/2.6.2
-DEFAULT_CDN = 'http://cdn.bootcss.com/reveal.js/2.6.2'
+DEFAULT_CDN = 'http://xuzhixiang.u.qiniudn.com/reveal/2.6.2'
 
 basehtml='''
 PCFkb2N0eXBlIGh0bWw+ICAKPGh0bWwgbGFuZz0iZW4iPgogIDxoZWFkPgogICAgPHRpdGxlPiR7
