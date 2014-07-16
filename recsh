@@ -1,4 +1,0 @@
-#!/bin/sh
-mkdir -p ~/.recsh
-logfile="$HOME/.recsh/`date +"%Y%m%d-%H%M%S.log"`"
-exec script $logfile
