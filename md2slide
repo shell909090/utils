@@ -32,111 +32,103 @@ This program is used to translate markdown file to html5 slide. It is based on [
 程序可以将markdown文档转换为html5的演示文档。程序基于[reveal](https://github.com/hakimel/reveal.js)项目完成。项目遵从上游，以MIT授权发布。具体情况请阅读源码。
 
 '''
-import os, re, sys, getopt
+import os, re, sys, base64, pprint, getopt, subprocess
 from mako.template import Template
 from BeautifulSoup import BeautifulSoup
 from os import path
 
-basehtml = '''
-<!doctype html>  
-<html lang="en">
-  <head>
-    <title>${title}</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link href='http://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
-    <link rel="stylesheet" href="reveal/main.css">
-    <link rel="stylesheet" href="reveal/default.css" id="theme">
-    <!-- For syntax highlighting -->
-    <link rel="stylesheet" href="reveal/lib/css/zenburn.css">
-    <script>
-      // If the query includes 'print-pdf' we'll use the PDF print sheet
-      document.write( '<link rel="stylesheet" href="reveal/' + ( window.location.search.match( /print-pdf/gi ) ? 'pdf' : 'paper' ) + '.css" type="text/css" media="print">' );
-    </script>
-  </head>
-  <body>
-    <script src="reveal/lib/js/head.min.js"></script>
-    <script src="reveal/reveal.min.js"></script>
+# http://xuzhixiang.u.qiniudn.com/reveal
+# http://cdn.bootcss.com/reveal.js/2.6.2
+DEFAULT_CDN = 'http://cdn.bootcss.com/reveal.js/2.6.2'
 
-    <div class="reveal">
-      <div class="state-background"></div>
-
-      % for slide in slides:
-      <div class="slides">
-	<section>
-	  ${slide}
-	</section>
-      </div>
-      % endfor
-
-      <!-- The navigational controls UI -->
-      <aside class="controls">
-	<a class="left" href="#">&#x25C4;</a>
-	<a class="right" href="#">&#x25BA;</a>
-	<a class="up" href="#">&#x25B2;</a>
-	<a class="down" href="#">&#x25BC;</a>
-      </aside>
-
-      <!-- Presentation progress bar -->
-      <div class="progress"><span></span></div>
-    </div>
-
-    <script>
-      // Full list of configuration options available here:
-      // https://github.com/hakimel/reveal.js#configuration
-      Reveal.initialize({
-      controls: true,
-      progress: true,
-      history: true,
-      
-      theme: Reveal.getQueryHash().theme || 'default', // available themes are in /css/theme
-      transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/linear(2d)
-
-      // Optional libraries used to extend on reveal.js
-      dependencies: [
-      { src: 'reveal/lib/js/highlight.js', async: true, callback: function() { window.hljs.initHighlightingOnLoad(); } },
-      { src: 'reveal/lib/js/classList.js', condition: function() { return !document.body.classList; } },
-      { src: 'reveal/lib/js/showdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
-      { src: 'reveal/lib/js/data-markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
-      ]
-      });
-    </script>
-  </body>
-</html>'''
-template = Template(basehtml)
+basehtml='''
+PCFkb2N0eXBlIGh0bWw+ICAKPGh0bWwgbGFuZz0iZW4iPgogIDxoZWFkPgogICAgPHRpdGxlPiR7
+dGl0bGV9PC90aXRsZT4KICAgIDxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVu
+dD0idGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ii8+CiAgICA8bWV0YSBuYW1lPSJhcHBsZS1tb2Jp
+bGUtd2ViLWFwcC1jYXBhYmxlIiBjb250ZW50PSJ5ZXMiIC8+CiAgICA8bWV0YSBuYW1lPSJhcHBs
+ZS1tb2JpbGUtd2ViLWFwcC1zdGF0dXMtYmFyLXN0eWxlIiBjb250ZW50PSJibGFjay10cmFuc2x1
+Y2VudCIgLz4KICAgIDxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0iJHtiYXNlfS9jc3MvcmV2
+ZWFsLmNzcyI+CiAgICA8bGluayByZWw9InN0eWxlc2hlZXQiIGhyZWY9IiR7YmFzZX0vY3NzL3Ro
+ZW1lL2RlZmF1bHQuY3NzIiBpZD0idGhlbWUiPgogICAgPCEtLSBGb3Igc3ludGF4IGhpZ2hsaWdo
+dGluZyAtLT4KICAgIDxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0iJHtiYXNlfS9saWIvY3Nz
+L3plbmJ1cm4uY3NzIj4KICAgIDwhLS0gSW5jbHVkZSB0aGUgYXBwcm9wcmlhdGUgcHJpbnQgc3R5
+bGVzaGVldCAtLT4KICA8L2hlYWQ+CiAgPGJvZHk+CiAgICA8ZGl2IGNsYXNzPSJyZXZlYWwiPgog
+ICAgICAlIGZvciBzbGlkZSBpbiBzbGlkZXM6CiAgICAgIDxkaXYgY2xhc3M9InNsaWRlcyI+Cgk8
+c2VjdGlvbj4KCSAgJSBpZiBsZW4oc2xpZGUpID09IDE6CgkgICR7c2xpZGVbMF19CgkgICUgZWxz
+ZToKICAgICAgICAgICAgJSBmb3Igc2VjdGlvbiBpbiBzbGlkZToKCSAgICA8c2VjdGlvbj4KCSAg
+ICAgICR7c2VjdGlvbn0KCSAgICA8L3NlY3Rpb24+CiAgICAgICAgICAgICUgZW5kZm9yCgkgICUg
+ZW5kaWYKCTwvc2VjdGlvbj4KICAgICAgPC9kaXY+CiAgICAgICUgZW5kZm9yCiAgICA8L2Rpdj4K
+ICAgIDxzY3JpcHQgc3JjPSIke2Jhc2V9L2xpYi9qcy9oZWFkLm1pbi5qcyI+PC9zY3JpcHQ+CiAg
+ICA8c2NyaXB0IHNyYz0iJHtiYXNlfS9qcy9yZXZlYWwuanMiPjwvc2NyaXB0PgogICAgPHNjcmlw
+dD4KLy8gRnVsbCBsaXN0IG9mIGNvbmZpZ3VyYXRpb24gb3B0aW9ucyBhdmFpbGFibGUgaGVyZToK
+Ly8gaHR0cHM6Ly9naXRodWIuY29tL2hha2ltZWwvcmV2ZWFsLmpzI2NvbmZpZ3VyYXRpb24KUmV2
+ZWFsLmluaXRpYWxpemUoewogICAgY29udHJvbHM6IHRydWUsCiAgICBwcm9ncmVzczogdHJ1ZSwK
+ICAgIGhpc3Rvcnk6IHRydWUsCgogICAgdGhlbWU6IFJldmVhbC5nZXRRdWVyeUhhc2goKS50aGVt
+ZSwgLy8gYXZhaWxhYmxlIHRoZW1lcyBhcmUgaW4gL2Nzcy90aGVtZQogICAgdHJhbnNpdGlvbjog
+UmV2ZWFsLmdldFF1ZXJ5SGFzaCgpLnRyYW5zaXRpb24gfHwgJ2RlZmF1bHQnLCAvLyBub25lL2Zh
+ZGUvc2xpZGUvY29udmV4L2NvbmNhdmUvem9vbQoKICAgIC8vIFBhcmFsbGF4IHNjcm9sbGluZwog
+ICAgLy8gcGFyYWxsYXhCYWNrZ3JvdW5kSW1hZ2U6ICdodHRwczovL3MzLmFtYXpvbmF3cy5jb20v
+aGFraW0tc3RhdGljL3JldmVhbC1qcy9yZXZlYWwtcGFyYWxsYXgtMS5qcGcnLAogICAgLy8gcGFy
+YWxsYXhCYWNrZ3JvdW5kU2l6ZTogJzIxMDBweCA5MDBweCcsCgogICAgLy8gT3B0aW9uYWwgbGli
+cmFyaWVzIHVzZWQgdG8gZXh0ZW5kIG9uIHJldmVhbC5qcwogICAgZGVwZW5kZW5jaWVzOiBbCgl7
+IHNyYzogJyR7YmFzZX0vbGliL2pzL2NsYXNzTGlzdC5qcycsIGNvbmRpdGlvbjogZnVuY3Rpb24o
+KSB7IHJldHVybiAhZG9jdW1lbnQuYm9keS5jbGFzc0xpc3Q7IH0gfSwKCXsgc3JjOiAnJHtiYXNl
+fS9wbHVnaW4vbWFya2Rvd24vbWFya2VkLmpzJywgY29uZGl0aW9uOiBmdW5jdGlvbigpIHsgcmV0
+dXJuICEhZG9jdW1lbnQucXVlcnlTZWxlY3RvciggJ1tkYXRhLW1hcmtkb3duXScgKTsgfSB9LAoJ
+eyBzcmM6ICcke2Jhc2V9L3BsdWdpbi9tYXJrZG93bi9tYXJrZG93bi5qcycsIGNvbmRpdGlvbjog
+ZnVuY3Rpb24oKSB7IHJldHVybiAhIWRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoICdbZGF0YS1tYXJr
+ZG93bl0nICk7IH0gfSwKCXsgc3JjOiAnJHtiYXNlfS9wbHVnaW4vaGlnaGxpZ2h0L2hpZ2hsaWdo
+dC5qcycsIGFzeW5jOiB0cnVlLCBjYWxsYmFjazogZnVuY3Rpb24oKSB7IGhsanMuaW5pdEhpZ2hs
+aWdodGluZ09uTG9hZCgpOyB9IH0sCgl7IHNyYzogJyR7YmFzZX0vcGx1Z2luL3pvb20tanMvem9v
+bS5qcycsIGFzeW5jOiB0cnVlLCBjb25kaXRpb246IGZ1bmN0aW9uKCkgeyByZXR1cm4gISFkb2N1
+bWVudC5ib2R5LmNsYXNzTGlzdDsgfSB9LAoJeyBzcmM6ICcke2Jhc2V9L3BsdWdpbi9ub3Rlcy9u
+b3Rlcy5qcycsIGFzeW5jOiB0cnVlLCBjb25kaXRpb246IGZ1bmN0aW9uKCkgeyByZXR1cm4gISFk
+b2N1bWVudC5ib2R5LmNsYXNzTGlzdDsgfSB9CiAgICBdCn0pOwogICAgPC9zY3JpcHQ+CiAgPC9i
+b2R5Pgo8L2h0bWw+Cg=='''
+template = Template(base64.b64decode(basehtml))
 
 def bsjoin(l):
     bs = BeautifulSoup()
     for i in l: bs.append(i)
     return bs
 
-def get_slides(src):
-    def splitbs(bs):
-        prevname = 'h1'
-        for i, b in enumerate(bs):
-            if not hasattr(b, 'name'): continue
-            if b.name == 'hr': return bs[:i], bs[i+1:]
-            elif b.name.startswith('h') and not prevname.startswith('h'):
-                return bs[:i], bs[i:]
-            prevname = b.name
-    bs = list(BeautifulSoup(src))
-    r = splitbs(bs)
-    while r:
-        yield bsjoin(r[0])
-        bs = r[1]
-        r = splitbs(bs)
-    yield bsjoin(bs)
+def split(l, f):
+    m = []
+    for i in l:
+        if f(i):
+            if m: yield m
+            m = []
+        m.append(i)
+    yield m
 
-def translate(src, title):
-    return template.render(slides=get_slides(src), title=title)
+def proc_section(bs):
+    if hasattr(bs[0], 'name') and bs[0].name == 'hr': bs = bs[1:]
+    # TODO: mapping fragment
+    return bsjoin(bs)
+
+def split_section(bs):
+    f = lambda i: hasattr(i, 'name') and (i.name.startswith('h') or i.name == 'hr')
+    return map(proc_section, list(split(bs, f)))
+
+def split_slide(bs):
+    f = lambda i: hasattr(i, 'name') and i.name == 'h1'
+    return map(split_section, list(split(bs, f)))
+
+def translate(src):
+    md = subprocess.check_output(['markdown', src]).decode('utf-8')
+    slides = split_slide(BeautifulSoup(md))
+    # pprint.pprint(list(slides))
+    return template.render(
+        slides=slides,
+        title=optdict.get('-t') or path.splitext(path.basename(src))[0],
+        base=optdict.get('-b') or DEFAULT_CDN)
 
 def translate_file(src, dst):
-    md = os.popen('markdown "%s"' % src).read().decode('utf-8')
-    html = translate(md, path.splitext(path.basename(src))[0])
-    if dst != '-':
-        with open(dst, 'w') as fo: fo.write(html.encode('utf-8'))
-    else: print html
+    html = translate(src).encode('utf-8')
+    if dst == '-':
+        sys.stdout.write(html)
+    else:
+        with open(dst, 'w') as fo: fo.write(html)
 
 def main():
     '''
@@ -144,8 +136,8 @@ def main():
     -h: help
     '''
     global optdict
-    optl, args = getopt.getopt(sys.argv[1:], 'ht:')
-    optdict = dict(optl)
+    optlist, args = getopt.getopt(sys.argv[1:], 'b:ht:')
+    optdict = dict(optlist)
     if '-h' in optdict or not args:
         exe = path.basename(sys.argv[0])
         print '%s v1.0\nusage: %s [-h] [-t]' % (exe, exe)
