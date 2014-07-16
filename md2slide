@@ -114,17 +114,14 @@ def split_slide(bs):
     return map(split_section, list(split(bs, f)))
 
 def translate(src):
+    dst = path.splitext(src)[0] + '.html'
     md = subprocess.check_output(['markdown', src]).decode('utf-8')
     slides = split_slide(BeautifulSoup(md))
-    # pprint.pprint(list(slides))
-    return template.render(
+    html = template.render(
         slides=slides,
         title=optdict.get('-t') or path.splitext(path.basename(src))[0],
-        base=optdict.get('-b') or DEFAULT_CDN)
-
-def translate_file(src, dst):
-    html = translate(src).encode('utf-8')
-    if dst == '-':
+        base=optdict.get('-b') or DEFAULT_CDN).encode('utf-8')
+    if '-c' in optdict:
         sys.stdout.write(html)
     else:
         with open(dst, 'w') as fo: fo.write(html)
@@ -135,15 +132,13 @@ def main():
     -h: help
     '''
     global optdict
-    optlist, args = getopt.getopt(sys.argv[1:], 'b:ht:')
+    optlist, args = getopt.getopt(sys.argv[1:], 'b:cht:')
     optdict = dict(optlist)
     if '-h' in optdict or not args:
         exe = path.basename(sys.argv[0])
         print '%s v1.0\nusage: %s [-h] [-t]' % (exe, exe)
         print main.__doc__
         return
-    output = path.splitext(args[0])[0] + '.html'
-    if len(args) > 1: output = args[1]
-    translate_file(args[0], output)
+    map(translate, args)
 
 if __name__ == '__main__': main()
