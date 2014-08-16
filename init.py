@@ -21,7 +21,7 @@ def apt_check_and_install(names):
     names = [name for name in names if subprocess.call(
             ['dpkg-query', '-s', name],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE) != 0]
-    if names: subprocess.call(' '.join(['aptitude', 'install'] + names))
+    if names: subprocess.call(['aptitude', 'install'] + names)
 
 def replace_if_or_append(s):
     def __inner(lines):
