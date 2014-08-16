@@ -178,7 +178,10 @@ pubkeys = [
     'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDDWECakpfuC1j/VbaAotYcfIuNFsw3MNH1epFfZRHfNMRfSblDdom22zOlLSe40qTJvcXGCGqGKKuL2TcYdlrCpAvIM9+xNxuPIJQbeZ4egmC0uCf/YiEuy6QeFb/c7/CQJ3qnhjUc7w65MvX7fwBFgKy6G0IZOOh5QD4cYZf2u1cAqAHxIWztdZfbTEpo9DHkYZlyd5QbhfnOqe4OGgTsXi2wMLeSWQGmRx59Tu1Rtds2HZZRt7dzgx6itR60M/GTa5IqTOeBPbYGgtoc4OAAeqtUqzYoN9EO/yjTzEzb4tKPku1juWvOc5sJtcLDGt4nM7jrCIsssm+1ODKGAhJf shell@debox']
 def pubkey():
     ''' deploy my ssh keys '''
-    try: os.makedirs(path.expanduser('~/.ssh/'))
+    try:
+        os.makedirs(path.expanduser('~/.ssh/'))
+        os.chmod(path.expanduser('~/.ssh/'),
+                 stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
     except OSError: pass
     rewrite('~/.ssh/authorized_keys', replace_if_or_append(
             dict([(k, k) for k in pubkeys])))
