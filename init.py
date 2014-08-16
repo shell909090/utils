@@ -171,8 +171,7 @@ def user():
                 'DEBEMAIL': 'export DEBEMAIL=%s' % getenv('email', 'debemail [%s]: '),
                 'DEBFULLNAME': 'export DEBFULLNAME="%s"' % getenv('name', 'debname [%s]: ')
                 })(lines)
-    # rewrite('~/.bashrc', edit)
-    rewrite('bashrc', edit)
+    rewrite('~/.bashrc', edit)
 
 pubkeys = [
     'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDDWECakpfuC1j/VbaAotYcfIuNFsw3MNH1epFfZRHfNMRfSblDdom22zOlLSe40qTJvcXGCGqGKKuL2TcYdlrCpAvIM9+xNxuPIJQbeZ4egmC0uCf/YiEuy6QeFb/c7/CQJ3qnhjUc7w65MvX7fwBFgKy6G0IZOOh5QD4cYZf2u1cAqAHxIWztdZfbTEpo9DHkYZlyd5QbhfnOqe4OGgTsXi2wMLeSWQGmRx59Tu1Rtds2HZZRt7dzgx6itR60M/GTa5IqTOeBPbYGgtoc4OAAeqtUqzYoN9EO/yjTzEzb4tKPku1juWvOc5sJtcLDGt4nM7jrCIsssm+1ODKGAhJf shell@debox']
