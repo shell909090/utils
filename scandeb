@@ -4,8 +4,7 @@
 @date: 2011-02-28
 @author: shell.xu
 @license:
-
-Copyright (C) 2012 Shell Xu
+Copyright (C) 2014 Shell Xu
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -24,79 +23,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 This program is used to scan deb pool, make dists directory. That make deb pool can be publish as a apt repository.
 
-All deb package must be put into pool/<category>. Category is classify name of repository, for example, stable/testing/unstable.
+All deb package must be put into pool/<release>/<category>. Release is a codename, like stable/testing/unstable. Category is classify name, like main/contrib/non-free. 
 
 该程序用于对deb包池进行扫描，生成dists目录。这样获得的目录可以用于apt更新发布。
 
-所有deb包必须放置在pool/<category>/下。category是仓库的分类名，例如stable, testing, unstable等。
+所有deb包必须放置在pool/<release>/<category>/下。release是代号，例如stable/testing/unstable。category是仓库分类，例如main/contrib/non-free。
 
 '''
-import os
-import sys
-import getopt
+import os, sys, getopt, shutil
 from os import path
 
-POOL_DIR = path.realpath('pool')
-DIST_DIR = path.realpath('dists')
+def safe_remove(p):
+    try: os.remove(p)
+    except OSError: pass
 
 def scan_for_arches(dirname):
     f = lambda n: path.splitext(n)[0].split('_')[2]
     return set(map(f, os.listdir(dirname)))
 
-def scan_dir(dirname, release, category, arch):
-    try: os.makedirs(path.join(DIST_DIR, release, category, 'binary-%s' % arch))
+def scan_dir(base, release, category, arch):
+    try: os.makedirs(path.join(base, 'dists', release, category, 'binary-%s' % arch))
     except OSError: pass
-    scan = 'dpkg-scanpackages -a %s pool/%s/%s /dev/null > dists/%s/%s/binary-%s/Packages'
-    os.system(scan % (arch, release, category, release, category, arch))
-    gz = 'gzip -c dists/%s/%s/binary-%s/Packages >dists/%s/%s/binary-%s/Packages.gz'
-    os.system(gz % (release, category, arch, release, category, arch))
+    srcpath = path.join(base, 'pool', release, category)
+    destpath = path.join(base, 'dists', release, category,
+                         'binary-%s' % arch, 'Packages.gz')
+    os.system('dpkg-scanpackages -a "%s" "%s" /dev/null | gzip -c > %s' % (
+            arch, srcpath, destpath))
 
-def archive_release(release):
-    dist_release_dir = path.join(DIST_DIR, release)
-    release_fullpath = path.join(dist_release_dir, 'Release')
-    gpg_fullpath = path.join(dist_release_dir, 'Release.gpg')
-    try: os.remove(release_fullpath)
-    except OSError: pass
-    try: os.remove(gpg_fullpath)
-    except OSError: pass
-    with os.popen('apt-ftparchive release "%s" -o %s -o APT::FTPArchive::Release::Codename="%s"' % \
-                      (dist_release_dir, 'APT::FTPArchive::Release::Origin="shell"', release)) as sf:
-        with open(release_fullpath, 'wb') as of: of.write(sf.read())
+def archive_release(base, release):
+    release_dir = path.join(base, 'dists', release)
+    release_path = path.join(release_dir, 'Release')
+    safe_remove(release_path)
+    safe_remove(release_path + '.gpg')
+    os.system('apt-ftparchive release "%s" -o APT::FTPArchive::Release::Origin="shell" -o APT::FTPArchive::Release::Codename="%s" > %s' % (release_dir, release, release_path))
 
-def scan_pool():
-    try: os.remove(POOL_DIR)
-    except OSError: pass
-    for release in os.listdir(POOL_DIR):
-        release_dir = path.join(POOL_DIR, release)
+def scan_pool(base):
+    for release in os.listdir(path.join(base, 'pool')):
+        release_dir = path.join(base, 'pool', release)
         for category in os.listdir(release_dir):
-            category_dir = path.join(release_dir, category)
-            for arch in scan_for_arches(category_dir):
-                scan_dir(category_dir, release, category, arch)
-        archive_release(release)
+            for arch in scan_for_arches(path.join(release_dir, category)):
+                scan_dir(base, release, category, arch)
+        archive_release(base, release)
 
-def sign_dist(user = None):
-    for release in os.listdir(POOL_DIR):
-        release_fullpath = path.join(DIST_DIR, release, 'Release')
-        gpg_fullpath = path.join(DIST_DIR, release, 'Release.gpg')
-        if not user: os.system('gpg -abs -o "%s" "%s"' % (gpg_fullpath, release_fullpath))
-        else: os.system('gpg -u "%s" -abs -o "%s" "%s"' % (user, gpg_fullpath, release_fullpath))
+def sign_dist(base, user=None):
+    for release in os.listdir(path.join(base, 'pool')):
+        rpath = path.join(base, 'dists', release, 'Release')
+        if not user: os.system('gpg -abs -o "%s" "%s"' % (rpath + '.gpg', rpath))
+        else: os.system('gpg -u "%s" -abs -o "%s" "%s"' % (user, rpath + '.gpg', rpath))
+
+def scan_path(base):
+    shutil.rmtree(path.join(base, 'dists'))
+    scan_pool(base)
+    if '-s' in optdict:
+        sign_dist(base, optdict.get('-u'))
 
 def main():
     '''
+    usage: scandeb [-h] [-u username] [-s]
     scan deb pool under current dir, and make dists.
     if run with -s option, sign dist with gpg keys.
     -h: help
     -s: sign dist
     -u: sign with username, pass to gpg
     '''
-    opts, args = getopt.getopt(sys.argv[1:], 'hsu:')
-    optd = dict(opts)
-    if '-h' in optd:
-        exe = path.basename(sys.argv[0])
-        print '%s v1.0\nusage: %s [-h] [-u username] [-s]' % (exe, exe)
+    global optdict
+    optlist, args = getopt.getopt(sys.argv[1:], 'hsu:')
+    optdict = dict(optlist)
+    if '-h' in optdict:
         print main.__doc__
         return
-    scan_pool()
-    if '-s' in optd: sign_dist(optd.get('-u', None))
+
+    if len(args) != 0:
+        for p in args: scan_path(p)
+    else: scan_path(os.getcwd())
 
 if __name__ == '__main__': main()
