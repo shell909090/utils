@@ -58,7 +58,7 @@ def rar_decmp(src, tgt):
 
 def lzip_decmp(src, tgt):
     os.chdir(tgt)
-    os.system('7zr x "%s"' % src)
+    os.system('7z x "%s"' % src)
     up_one_level(tgt)
 
 def zip_decmp(src, tgt):
