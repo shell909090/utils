@@ -27,12 +27,10 @@ This program can translate all kind of package to standard comic package, jpeg i
 这个程序是用于将各种格式的压缩文件转换为标准的压缩文件，zip压缩，jpeg格式。支持的格式有rar，zip，7z。包括压缩包内嵌套7z。
 
 '''
-import os, sys, shutil, getopt, zipfile, tempfile
+import os, sys, pipes, shutil, getopt, zipfile, tempfile
 from os import path
 
-def init_temp(base): return tempfile.mkdtemp(dir = base)
-
-def free_temp(tmp): shutil.rmtree(tmp)
+compress_ext = set(['.zip', '.rar', '.7z'])
 
 def up_one_level(pth):
     ''' up contain if just have one entry in directory '''
@@ -44,26 +42,19 @@ def up_one_level(pth):
     os.rmdir(pth)
     os.rename(tmp_up, pth)
 
-def check7zp(src):
-    ''' check if an zip file contain 7z file '''
-    with zipfile.ZipFile(src, 'r') as srcfile:
-        for name in srcfile.namelist():
-            if name.lower().endswith('.7z'): return True
-    return False
-
 def rar_decmp(src, tgt):
     os.chdir(tgt)
-    os.system('unrar x "%s"' % src)
+    os.system('unrar x %s' % pipes.quote(src))
     up_one_level(tgt)
 
 def lzip_decmp(src, tgt):
     os.chdir(tgt)
-    os.system('7zr x "%s"' % src)
+    os.system('7z x %s' % pipes.quote(src))
     up_one_level(tgt)
 
 def zip_decmp(src, tgt):
     os.chdir(tgt)
-    os.system('unzip "%s"' % src)
+    os.system('unzip %s' % pipes.quote(src))
     up_one_level(tgt)
 
 def decompress(src, tgt):
@@ -71,6 +62,14 @@ def decompress(src, tgt):
     filemap = {'.zip': zip_decmp, '.rar': rar_decmp, '.7z': lzip_decmp}
     try: return filemap[ext](src, tgt)
     except KeyError: raise Exception('unknown source format %s' % ext)
+
+def compress_to_dir(filepath):
+    dirname, ext = path.splitext(filepath)
+    assert ext, 'compress file without extname'
+    try: os.mkdir(dirname)
+    except OSError: pass
+    decompress(filepath, dirname)
+    os.remove(filepath)
 
 def zip_cmp(src, tgt):
     with zipfile.ZipFile(tgt, 'w', zipfile.ZIP_DEFLATED) as tgtfile:
@@ -81,71 +80,45 @@ def zip_cmp(src, tgt):
 
 def pic_to_jpg(pth):
     ''' translate all file under path to jpeg format if can '''
-    for base, dirs, files in os.walk(pth):
-        os.chdir(base)
-        for i, f in enumerate(files):
-            ext = path.splitext(f)
-            if ext[1].lower() in ('.jpg', '.jpeg'): continue
-            os.system('convert "%s" "%s.jpg"' % (f, ext[0]))
-            os.remove(f)
-            sys.stdout.write('process %s (%d/%d)...\r' % (base, i, len(files)))
-    print 'process done.              \r\n'
-
-def lzip_to_dir(base, f):
-    mainname = path.splitext(f)[0]
-    os.chdir(base)
-    try: os.mkdir(mainname)
-    except OSError: pass
-    print base, f, mainname
-    lzip_decmp(path.join(base, f), path.join(base, mainname))
-    os.remove(path.join(base, f))
+    os.chdir(pth)
+    cmd = "find %s -type f ! -name '*.jpg' -o -name '*.jpeg' | parallel -j %d 'convert {} {.}.jpg; rm {}'" % (
+        pipes.quote(pth), int(optdict.get('-j')))
+    os.system(cmd)
+    print 'process done.\r\n'
 
 # try use recursion
 def trans_lz(filepath):
     cur_path = os.getcwd()
     fullpath = path.abspath(filepath)
-    tmp = init_temp('/tmp/' if '-t' in optdict else cur_path)
+    tmp = tempfile.mkdtemp(dir='/tmp/' if '-c' not in optdict else cur_path)
     try:
         decompress(fullpath, tmp)
         for base, dirs, files in os.walk(tmp):
             for f in files:
-                if path.splitext(f)[1].lower() == '.7z': lzip_to_dir(base, f)
+                if path.splitext(f)[1].lower() in compress_ext:
+                    compress_to_dir(path.join(base, f))
         pic_to_jpg(tmp)
         zip_cmp(tmp, '%s-new.zip' % path.splitext(fullpath)[0])
     finally:
-        if '-f' in optdict: free_temp(tmp)
+        if '-f' not in optdict: shutil.rmtree(tmp)
     os.chdir(cur_path)
 
-def check_dir(filepath):
-    for base, dirs, files in os.walk(filepath):
-        for f in files:
-            if path.splitext(f)[1].lower() == '.7z':
-                yield path.join(base, f)
-            elif path.splitext(f)[1].lower() == '.zip':
-                fullpath = path.join(base, f)
-                if check7zp(fullpath): yield fullpath
-
 def main():
-    '''
-    -h: help
-    -t: use /tmp as temp base
-    -f: free temp directory
-    -l: list file contain 7z
+    '''v1.0
+    usage: 7zptocmx [-h] [-f] [-l] filename
+    -c: don't use /tmp as temp base
+    -f: not free temp directory
     -j: smp process
+    -h: help
     '''
-    # TODO: -j 4
     global optdict
-    optlist, args = getopt.getopt(sys.argv[1:], 'fj:hl')
+    optlist, args = getopt.getopt(sys.argv[1:], 'cfj:h')
     optdict = dict(optlist)
     if '-h' in optdict or not args:
-        exe = path.basename(sys.argv[0])
-        print '%s v1.0\nusage: %s [-h] [-f] [-l] filename' % (exe, exe)
         print main.__doc__
         return
-    if '-l' in optdict:
-        for arg in args:
-            for i in check_dir(arg): print i
-        return
+
+    optdict.setdefault('-j', '4')
     for arg in args: trans_lz(arg)
 
 if __name__ == '__main__': main()
