@@ -32,16 +32,15 @@ from os import path
 
 def pack(filepath):
     with open(filepath, 'r') as fi:
-        r = base64.b64encode(zlib.compress(fi.read()))
+        r = base64.b64encode(zlib.compress(fi.read(), 9))
     with open(filepath, 'w') as fo:
         fo.write('''#!/usr/bin/python
-exec(compile(__import__('zlib').decompress(__import__('base64').b64decode('%s')), '', 'exec'))''' % r)
+import zlib, base64; eval(compile(zlib.decompress(base64.b64decode("%s")),"","exec"))''' % r)
 
-re_exec = re.compile('''exec\(compile\S*zlib\S*decompress\S*base64\S*b64decode\('(.*)'\)\), '', 'exec'\)\)''')
+re_exec = re.compile('''eval\(compile\(zlib\.decompress\(base64\.b64decode\('(.*)'\)\),"","exec"\)\)''')
 def unpack(filepath):
     with open(filepath, 'r') as fi:
-        for line in fi:
-            if line.startswith('exec'): r = re_exec.match(line).groups(1)[0]
+        r = re_exec.search(fi.read()).groups(1)[0]
     with open(filepath, 'w') as fo:
         fo.write(zlib.decompress(base64.b64decode(r)))
 
