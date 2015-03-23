@@ -30,7 +30,7 @@ All deb package must be put into pool/<release>/<category>. Release is a codenam
 所有deb包必须放置在pool/<release>/<category>/下。release是代号，例如stable/testing/unstable。category是仓库分类，例如main/contrib/non-free。
 
 '''
-import os, sys, getopt, shutil
+import os, sys, getopt, shutil, subprocess
 from os import path
 
 def safe_remove(p):
@@ -47,15 +47,22 @@ def scan_dir(base, release, category, arch):
     srcpath = path.join(base, 'pool', release, category)
     destpath = path.join(base, 'dists', release, category,
                          'binary-%s' % arch, 'Packages.gz')
-    os.system('dpkg-scanpackages -a "%s" "%s" /dev/null | gzip -c > %s' % (
-            arch, srcpath, destpath))
+    with open(destpath, 'wb') as fo:
+        p1 = subprocess.Popen(['dpkg-scanpackages', '-a', arch, srcpath],
+                              stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(['gzip', '-c'], stdin=p1.stdout, stdout=fo)
+        return p1.wait() or p2.wait()
 
 def archive_release(base, release):
     release_dir = path.join(base, 'dists', release)
     release_path = path.join(release_dir, 'Release')
     safe_remove(release_path)
     safe_remove(release_path + '.gpg')
-    os.system('apt-ftparchive release "%s" -o APT::FTPArchive::Release::Origin="shell" -o APT::FTPArchive::Release::Codename="%s" > %s' % (release_dir, release, release_path))
+    with open(release_path, 'wb') as fo:
+        return subprocess.Popen([
+            'apt-ftparchive', 'release', release_dir,
+            '-o', 'APT::FTPArchive::Release::Origin="shell"',
+            '-o', 'APT::FTPArchive::Release::Codename="%s"' % release], stdout=fo).wait()
 
 def scan_pool(base):
     for release in os.listdir(path.join(base, 'pool')):
@@ -67,9 +74,10 @@ def scan_pool(base):
 
 def sign_dist(base, user=None):
     for release in os.listdir(path.join(base, 'pool')):
-        rpath = path.join(base, 'dists', release, 'Release')
-        if not user: os.system('gpg -abs -o "%s" "%s"' % (rpath + '.gpg', rpath))
-        else: os.system('gpg -u "%s" -abs -o "%s" "%s"' % (user, rpath + '.gpg', rpath))
+        release_path = path.join(base, 'dists', release, 'Release')
+        cmds = ['gpg', '-abs', '-o', release_path + '.gpg', release_path]
+        if user: cmds.extend(['-u', user])
+        subprocess.Popen(cmds).wait()
 
 def scan_path(base):
     shutil.rmtree(path.join(base, 'dists'))
