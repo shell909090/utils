@@ -23,53 +23,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 This program is used to scan deb pool, make dists directory. That make deb pool can be publish as a apt repository.
 
-All deb package must be put into pool/<release>/<category>. Release is a codename, like stable/testing/unstable. Category is classify name, like main/contrib/non-free. 
+All deb package must be put into pool/<release>/.
+
+Release is a codename, like stable/testing/unstable.
+
+ Category is classify name, like main/contrib/non-free. 
 
 该程序用于对deb包池进行扫描，生成dists目录。这样获得的目录可以用于apt更新发布。
 
-所有deb包必须放置在pool/<release>/<category>/下。release是代号，例如stable/testing/unstable。category是仓库分类，例如main/contrib/non-free。
+所有deb包必须放置在pool/<release>/下。
+
+release是代号，例如stable/testing/unstable。
+
+category是仓库分类，例如main/contrib/non-free。
 
 '''
 import os, sys, getopt, shutil, subprocess
 from os import path
 
-def safe_remove(p):
-    try: os.remove(p)
+def os_safe(f, p):
+    try: f(p)
     except OSError: pass
+
+def findfile(basepath):
+    for base, dirs, files in os.walk(basepath):
+        for f in files: yield path.join(base, f)
 
 def scan_for_arches(dirname):
-    f = lambda n: path.splitext(n)[0].split('_')[2]
-    return set(map(f, os.listdir(dirname)))
+    return set(map(lambda n: path.splitext(n)[0].split('_')[-1], findfile(dirname)))
 
 def scan_dir(base, release, category, arch):
-    try: os.makedirs(path.join(base, 'dists', release, category, 'binary-%s' % arch))
-    except OSError: pass
-    srcpath = path.join(base, 'pool', release, category)
+    os_safe(os.makedirs, path.join(base, 'dists', release, category, 'binary-%s' % arch))
+    srcpath = path.join(base, 'pool', release)
     destpath = path.join(base, 'dists', release, category,
                          'binary-%s' % arch, 'Packages.gz')
     with open(destpath, 'wb') as fo:
-        p1 = subprocess.Popen(['dpkg-scanpackages', '-a', arch, srcpath],
-                              stdout=subprocess.PIPE)
-        p2 = subprocess.Popen(['gzip', '-c'], stdin=p1.stdout, stdout=fo)
+        p1 = subprocess.Popen(['apt-ftparchive', 'packages', '-a', arch, srcpath], stdout=fo)
+        # stdout=subprocess.PIPE)
+        # p2 = subprocess.Popen(['gzip', '-9c'], stdin=p1.stdout, stdout=fo)
         return p1.wait() or p2.wait()
 
 def archive_release(base, release):
     release_dir = path.join(base, 'dists', release)
     release_path = path.join(release_dir, 'Release')
-    safe_remove(release_path)
-    safe_remove(release_path + '.gpg')
+    os_safe(os.remove, release_path)
+    os_safe(os.remove, release_path + '.gpg')
     with open(release_path, 'wb') as fo:
         return subprocess.Popen([
             'apt-ftparchive', 'release', release_dir,
-            '-o', 'APT::FTPArchive::Release::Origin="shell"',
-            '-o', 'APT::FTPArchive::Release::Codename="%s"' % release], stdout=fo).wait()
+            '-o', 'APT::FTPArchive::Release::Origin=shell',
+            '-o', 'APT::FTPArchive::Release::Codename=%s' % release], stdout=fo).wait()
 
-def scan_pool(base):
+def scan_pool(base, category):
     for release in os.listdir(path.join(base, 'pool')):
         release_dir = path.join(base, 'pool', release)
-        for category in os.listdir(release_dir):
-            for arch in scan_for_arches(path.join(release_dir, category)):
-                scan_dir(base, release, category, arch)
+        for arch in scan_for_arches(release_dir):
+            scan_dir(base, release, category, arch)
         archive_release(base, release)
 
 def sign_dist(base, user=None):
@@ -80,8 +89,8 @@ def sign_dist(base, user=None):
         subprocess.Popen(cmds).wait()
 
 def scan_path(base):
-    shutil.rmtree(path.join(base, 'dists'))
-    scan_pool(base)
+    os_safe(shutil.rmtree, path.join(base, 'dists'))
+    scan_pool(base, optdict.get('-c', 'main'))
     if '-s' in optdict:
         sign_dist(base, optdict.get('-u'))
 
@@ -90,12 +99,13 @@ def main():
     usage: scandeb [-h] [-u username] [-s]
     scan deb pool under current dir, and make dists.
     if run with -s option, sign dist with gpg keys.
+    -c: category, default is main
     -h: help
     -s: sign dist
     -u: sign with username, pass to gpg
     '''
     global optdict
-    optlist, args = getopt.getopt(sys.argv[1:], 'hsu:')
+    optlist, args = getopt.getopt(sys.argv[1:], 'c:hsu:')
     optdict = dict(optlist)
     if '-h' in optdict:
         print main.__doc__
