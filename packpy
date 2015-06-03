@@ -37,7 +37,7 @@ def pack(filepath):
         fo.write('''#!/usr/bin/python
 import zlib, base64; eval(compile(zlib.decompress(base64.b64decode("%s")),"","exec"))''' % r)
 
-re_exec = re.compile('''eval\(compile\(zlib\.decompress\(base64\.b64decode\('(.*)'\)\),"","exec"\)\)''')
+re_exec = re.compile('''eval\(compile\(zlib\.decompress\(base64\.b64decode\("(.*)"\)\),"","exec"\)\)''')
 def unpack(filepath):
     with open(filepath, 'r') as fi:
         r = re_exec.search(fi.read()).groups(1)[0]
