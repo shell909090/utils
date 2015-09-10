@@ -102,7 +102,6 @@ def split(l, f):
 
 def proc_section(bs):
     if hasattr(bs[0], 'name') and bs[0].name == 'hr': bs = bs[1:]
-    # TODO: mapping fragment
     return bsjoin(bs)
 
 def split_section(bs):
@@ -128,6 +127,9 @@ def translate(src):
 
 def main():
     '''
+    md2slide v1.0
+    -b: reveal url base
+    -c: stdout
     -t: title
     -h: help
     '''
@@ -135,8 +137,6 @@ def main():
     optlist, args = getopt.getopt(sys.argv[1:], 'b:cht:')
     optdict = dict(optlist)
     if '-h' in optdict or not args:
-        exe = path.basename(sys.argv[0])
-        print '%s v1.0\nusage: %s [-h] [-t]' % (exe, exe)
         print main.__doc__
         return
     map(translate, args)
