@@ -132,6 +132,7 @@ def main():
     -c: stdout
     -t: title
     -h: help
+    -t: title
     '''
     global optdict
     optlist, args = getopt.getopt(sys.argv[1:], 'b:cht:')
