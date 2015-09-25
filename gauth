@@ -6,16 +6,13 @@
 @copyright: 2015, Shell.Xu <shell909090@gmail.com>
 @license: BSD-3-clause
 '''
-import os
 import sys
 import time
 import hmac
 import base64
 import getopt
 import struct
-import socket
 import hashlib
-from os import path
 
 def calotp(secret):
     secret = base64.b32decode(secret)
