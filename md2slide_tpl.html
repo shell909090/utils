@@ -5,37 +5,32 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="stylesheet" 
-        href="http://cdn.staticfile.org/reveal.js/2.6.2/css/reveal.css">
-    <link rel="stylesheet" 
-        href="http://cdn.staticfile.org/reveal.js/2.6.2/css/theme/default.css" id="theme">
+    <link rel="stylesheet" href="${base}/css/reveal.css">
+    <link rel="stylesheet" href="${base}/css/theme/default.css" id="theme">
     <!-- For syntax highlighting -->
-    <link rel="stylesheet" 
-        href="http://cdn.staticfile.org/reveal.js/2.6.2/lib/css/zenburn.css">
+    <link rel="stylesheet" href="${base}/lib/css/zenburn.css">
     <!-- Include the appropriate print stylesheet -->
   </head>
   <body>
     <div class="reveal">
       % for slide in slides:
       <div class="slides">
-    <section>
-      % if len(slide) == 1:
-      ${slide[0]}
-      % else:
+	<section>
+	  % if len(slide) == 1:
+	  ${slide[0]}
+	  % else:
             % for section in slide:
-        <section>
-          ${section}
-        </section>
+	    <section>
+	      ${section}
+	    </section>
             % endfor
-      % endif
-    </section>
+	  % endif
+	</section>
       </div>
       % endfor
     </div>
-    <script 
-        src="http://cdn.staticfile.org/reveal.js/2.6.2/lib/js/head.min.js"></script>
-    <script 
-        src="http://cdn.staticfile.org/reveal.js/2.6.2/js/reveal.min.js"></script>
+    <script src="${base}/lib/js/head.min.js"></script>
+    <script src="${base}/js/reveal.js"></script>
     <script>
 // Full list of configuration options available here:
 // https://github.com/hakimel/reveal.js#configuration
@@ -53,12 +48,12 @@ Reveal.initialize({
 
     // Optional libraries used to extend on reveal.js
     dependencies: [
-    { src: 'http://cdn.staticfile.org/reveal.js/2.6.2/lib/js/classList.js', condition: function() { return !document.body.classList; } },
-    { src: 'http://cdn.staticfile.org/reveal.js/2.6.2/plugin/markdown/marked.js'
-    , condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
-    { src: 'http://cdn.staticfile.org/reveal.js/2.6.2/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
-    { src: 'http://cdn.staticfile.org/reveal.js/2.6.2/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
-    { src: 'http://cdn.staticfile.org/reveal.js/2.6.2/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }
+	{ src: '${base}/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+	{ src: '${base}/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+	{ src: '${base}/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+	{ src: '${base}/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+	{ src: '${base}/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+	{ src: '${base}/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }
     ]
 });
     </script>
