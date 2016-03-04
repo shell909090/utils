@@ -1,0 +1,23 @@
+#!/bin/bash
+
+cdjump() {
+    local prefix=$1
+    local result
+    local line
+    local num
+    local k=0
+
+    for line in $(mlocate $prefix)
+    do
+	if [ -z $(echo "$line" | grep "$prefix.*/") ] && [ -d "$line" ]
+	then
+	    result[k++]="$line"
+	fi
+    done
+
+    select num in ${result[*]};
+    do
+    	cd $num
+	break
+    done
+}
