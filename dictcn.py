@@ -37,7 +37,7 @@ def query_dict(words):
     doc = BeautifulSoup(resp.content)
     unfind = doc.find('div', class_='unfind')
     if unfind is not None:
-        return unfind.get_text()
+        return unfind.get_text().encode('utf-8')
 
     output = cStringIO.StringIO()
     write = currying(write_node, output)
