@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# 导入一个函数，在locate中搜索关键词，得到应当转跳的目录，并提供给用户选择。
 cdjump() {
     local prefix=$1
     local result
