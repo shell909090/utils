@@ -16,6 +16,7 @@ Copyright (C) 2016 Shell Xu
 
 '''
 import os, sys
+import getopt
 import cStringIO
 import requests
 from bs4 import BeautifulSoup
