@@ -42,10 +42,11 @@ def query_dict(words):
     output = cStringIO.StringIO()
     write = currying(write_node, output)
     map(write, doc.find('div', class_='phonetic').find_all('span'))
-    map(write,
-        filter(lambda li: 'style' not in li.attrs,
-               doc.find('ul', class_='dict-basic-ul').find_all('li')))
-    map(write, doc.find('div', class_='shape').find_all('span'))
+    basic = doc.find('ul', class_='dict-basic-ul')
+    map(write, [li for li in basic.find_all('li') if 'style' not in li.attrs])
+    shape = doc.find('div', class_='shape')
+    if shape:
+        map(write, shape.find_all('span'))
     return output.getvalue().strip()
 
 def main():
