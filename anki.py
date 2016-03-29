@@ -14,7 +14,8 @@ def main():
     dictcn.optdict = {'-s': 1, '-p': 1}
 
     with open(sys.argv[1]) as fi:
-        wordlist = [line.strip() for line in fi]
+        content = fi.read().decode('utf-8-sig')
+    wordlist = [line.strip() for line in content.splitlines()]
 
     with open(sys.argv[1], 'wb') as fi:
         writer = csv.writer(fi)
