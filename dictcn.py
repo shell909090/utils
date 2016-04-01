@@ -34,7 +34,7 @@ def query_dict(words):
     if resp.status_code != 200:
         raise Exception(resp.status_code)
 
-    doc = BeautifulSoup(resp.content)
+    doc = BeautifulSoup(resp.content, 'lxml')
     unfind = doc.find('div', class_='unfind')
     if unfind is not None:
         return unfind.get_text().encode('utf-8')
