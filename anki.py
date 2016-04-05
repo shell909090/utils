@@ -20,6 +20,6 @@ def main():
     with open(sys.argv[1], 'wb') as fi:
         writer = csv.writer(fi)
         for word in wordlist:
-            writer.writerow((word, dictcn.query_dict(word)))
+            writer.writerow((word.lower(), dictcn.query_dict(word)))
 
 if __name__ == '__main__': main()
