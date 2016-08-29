@@ -15,9 +15,9 @@ Copyright (C) 2016 Shell Xu
 注：返回内容的版权归dict.cn所有。
 
 '''
-from __future__ import absolute_import, division, print_function, unicode_literals
-import os, sys
-import codecs
+from __future__ import absolute_import, division,\
+    print_function, unicode_literals
+import sys
 import getopt
 try:
     from StringIO import StringIO
@@ -26,13 +26,14 @@ except ImportError:
 import requests
 from bs4 import BeautifulSoup
 
-import binascii
 
 def get_node_str(node):
     return node.get_text(strip=True)
 
+
 def get_nodes_str(nodes):
     return '\n'.join(map(get_node_str, nodes))
+
 
 def query_dict(words):
     resp = requests.get('http://dict.cn/' + words)
@@ -65,13 +66,16 @@ def query_dict(words):
 
     return result
 
+
 def currying(func, param):
     def inner(*params):
         return func(param, *params)
     return inner
 
+
 def write_node(stream, node, strip=True):
     stream.write(node.get_text(strip=strip).encode('utf-8')+'\n')
+
 
 def format_result(info):
     output = StringIO()
@@ -97,6 +101,7 @@ def format_result(info):
 
     return output.getvalue().strip()
 
+
 def main():
     ''' dictcn.py [-h] [-p] [-s] word '''
     optlist, args = getopt.getopt(sys.argv[1:], 'hpsw')
@@ -107,6 +112,7 @@ def main():
 
     for arg in args:
         info = query_dict(arg)
-        print(format_result(info))
+        print(format_result(info).encode('utf-8'))
 
-if __name__ == '__main__': main()
+if __name__ == '__main__':
+    main()
