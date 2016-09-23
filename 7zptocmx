@@ -1,11 +1,12 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 '''
-@date: 2010-06-07
-@author: shell.xu
+@date: 2016-07-02
+@author: Shell.Xu
+@copyright: 2016, Shell.Xu <shell909090@gmail.com>
 @license: GPL-3
 
-Copyright (C) 2012 Shell Xu
+Copyright (C) 2012-2016 Shell Xu
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,103 +23,207 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 @comment:
 
-This program can translate all kind of package to standard comic package, jpeg image format, zip package. It support rar, zip, 7z, and support 7z file in rar file.
+This program can translate all kind of package to standard comic
+package, jpeg image format, zip package.
+It support rar, zip, 7z, and support 7z file in rar file.
 
-这个程序是用于将各种格式的压缩文件转换为标准的压缩文件，zip压缩，jpeg格式。支持的格式有rar，zip，7z。包括压缩包内嵌套7z。
-
+这个程序是用于将各种格式的压缩文件转换为标准的压缩文件，zip压缩，jpeg格式。
+支持的格式有rar，zip，7z。包括压缩包内嵌套7z。
 '''
-import os, sys, pipes, shutil, getopt, zipfile, tempfile
+import os
+import sys
+import getopt
+import shutil
+import logging
+import tempfile
+import subprocess
 from os import path
+from contextlib import contextmanager
+from multiprocessing.pool import ThreadPool as Pool
 
-compress_ext = set(['.zip', '.rar', '.7z'])
+
+devnull = open('/dev/null', 'w')
+
+
+@contextmanager
+def chdir(newdir):
+    curdir = os.getcwd()
+    try:
+        os.chdir(newdir)
+        yield
+    finally:
+        os.chdir(curdir)
+
+
+def walk(rootdir):
+    for base, dirs, files in os.walk(rootdir):
+        for filename in files:
+            yield filename, path.join(base, filename)
+
+
+def walk_with_ext(rootdir, exts):
+    for filename, filepath in walk(rootdir):
+        ext = path.splitext(filename)[1].lower()
+        if ext not in exts:
+            continue
+        yield filename, filepath
+
 
 def up_one_level(pth):
     ''' up contain if just have one entry in directory '''
     lpth = os.listdir(pth)
-    if len(lpth) != 1: return
+    if len(lpth) != 1:
+        return
     downlevel = path.join(pth, lpth[0])
     tmp_up = path.join(path.dirname(pth), 'tmp')
     os.rename(downlevel, tmp_up)
     os.rmdir(pth)
     os.rename(tmp_up, pth)
 
-def rar_decmp(src, tgt):
-    os.chdir(tgt)
-    os.system('unrar x %s' % pipes.quote(src))
-    up_one_level(tgt)
 
-def lzip_decmp(src, tgt):
-    os.chdir(tgt)
-    os.system('7z x %s' % pipes.quote(src))
-    up_one_level(tgt)
+def decompress_zip(src, dstdir):
+    logging.warning('unzip %s => %s' % (src, dstdir))
+    ret = subprocess.call(['unzip', src, '-d', dstdir])
+    assert ret == 0
 
-def zip_decmp(src, tgt):
-    os.chdir(tgt)
-    os.system('unzip %s' % pipes.quote(src))
-    up_one_level(tgt)
 
-def decompress(src, tgt):
+def compress_zip(srcdir, dst):
+    logging.warning('zip %s => %s' % (srcdir, dst))
+    with chdir(srcdir):
+        ret = subprocess.call(['zip', '-9', '-r', dst, '.'])
+        assert ret == 0
+
+
+def decompress_rar(src, dstdir):
+    logging.warning('unrar %s => %s' % (src, dstdir))
+    with chdir(dstdir):
+        ret = subprocess.call(['unrar', 'x', src])
+        assert ret == 0
+
+
+def decompress_7z(src, dstdir):
+    logging.warning('7z %s => %s' % (src, dstdir))
+    with chdir(dstdir):
+        ret = subprocess.call(['7z', 'x', src])
+        assert ret == 0
+
+
+UNPACK_REG = {
+    '.zip': decompress_zip,
+    '.rar': decompress_rar,
+    '.7z': decompress_7z,
+}
+
+
+def decompress(src, dstdir):
     ext = path.splitext(src)[1].lower()
-    filemap = {'.zip': zip_decmp, '.rar': rar_decmp, '.7z': lzip_decmp}
-    try: return filemap[ext](src, tgt)
-    except KeyError: raise Exception('unknown source format %s' % ext)
-
-def compress_to_dir(filepath):
-    dirname, ext = path.splitext(filepath)
-    assert ext, 'compress file without extname'
-    try: os.mkdir(dirname)
-    except OSError: pass
-    decompress(filepath, dirname)
-    os.remove(filepath)
-
-def zip_cmp(src, tgt):
-    with zipfile.ZipFile(tgt, 'w', zipfile.ZIP_DEFLATED) as tgtfile:
-        for base, dirs, files in os.walk(src):
-            for f in files:
-                tgtpath = path.join(base, f)
-                tgtfile.write(tgtpath, tgtpath[len(src)+1:])
-
-def pic_to_jpg(pth):
-    ''' translate all file under path to jpeg format if can '''
-    os.chdir(pth)
-    cmd = "find %s -type f ! -name '*.jpg' -o -name '*.jpeg' | parallel -j %d 'convert {} {.}.jpg; rm {}'" % (
-        pipes.quote(pth), int(optdict.get('-j')))
-    os.system(cmd)
-    print 'process done.\r\n'
-
-# try use recursion
-def trans_lz(filepath):
-    cur_path = os.getcwd()
-    fullpath = path.abspath(filepath)
-    tmp = tempfile.mkdtemp(dir='/tmp/' if '-c' not in optdict else cur_path)
     try:
-        decompress(fullpath, tmp)
-        for base, dirs, files in os.walk(tmp):
-            for f in files:
-                if path.splitext(f)[1].lower() in compress_ext:
-                    compress_to_dir(path.join(base, f))
-        pic_to_jpg(tmp)
-        zip_cmp(tmp, '%s-new.zip' % path.splitext(fullpath)[0])
+        result = UNPACK_REG.get(ext)(src, dstdir)
+    except KeyError:
+        raise Exception('unrecognized ext: {}'.format(ext))
+    up_one_level(dstdir)
+    return result
+
+
+compress = compress_zip
+
+
+def recursion_decompress(rootdir):
+    packages = list(walk_with_ext(rootdir, ('.zip', '.rar', '.7z')))
+    for filename, filepath in packages:
+        target = path.splitext(filepath)[0]
+        os.makedirs(target)
+        decompress(filepath, target)
+        os.remove(filepath)
+
+
+def convert(src, dst):
+    logging.info('convert %s => %s' % (src, dst))
+    ret = subprocess.call([
+        'convert', '-quality', str(optdict.get('-q')), '-strip',
+        src, dst], stdout=devnull)
+    assert ret == 0
+
+
+def jpegtran(src, dst):
+    logging.info('jpegtran %s => %s' % (src, dst))
+    ret = subprocess.call(
+        ['jpegtran', '-optimize', '-progressive', '-outfile', dst, src])
+    assert ret == 0
+
+
+def jpg_optimizer(source):
+    target = path.splitext(source)[0] + '.jpg'
+    logging.warning('jpg optimize %s => %s' % (source, target))
+    with tempfile.NamedTemporaryFile(suffix='.jpg') as temp:
+        logging.debug('with temp %s' % temp.name)
+        convert(source, temp.name)
+        os.remove(source)
+        jpegtran(temp.name, target)
+
+
+def trans_to_jpg(rootdir):
+    pool = Pool(processes=int(optdict['-j']))
+    for filename, filepath in walk_with_ext(
+            rootdir, ('.jpg', '.jpeg', '.png', '.bmp')):
+        # jpg_optimizer(filepath)
+        pool.apply_async(jpg_optimizer, (filepath,))
+    pool.close()
+    pool.join()
+
+
+def proc_comic(filename):
+    source_path = path.abspath(filename)
+    target_path = path.splitext(source_path)[0] + '.zip'
+    if source_path == target_path:
+        target_path = '%s_new.zip' % path.splitext(source_path)[0]
+    if path.exists(target_path):
+        raise Exception('target file exists: %s' % target_path)
+    logging.warning('pack %s => %s' % (source_path, target_path))
+
+    tempdir = tempfile.mkdtemp(dir=optdict.get('-t'))
+    logging.debug('mktemp dir %s' % tempdir)
+
+    try:
+        decompress(source_path, tempdir)
+        recursion_decompress(tempdir)
+        trans_to_jpg(tempdir)
+        compress(tempdir, target_path)
     finally:
-        if '-f' not in optdict: shutil.rmtree(tmp)
-    os.chdir(cur_path)
+        if '-r' not in optdict:
+            logging.info('rm tempdir')
+            shutil.rmtree(tempdir)
+
 
 def main():
-    '''v1.0
-    usage: 7zptocmx [-h] [-f] [-l] filename
-    -c: don't use /tmp as temp base
-    -f: not free temp directory
-    -j: smp process
+    '''
     -h: help
+    -j: concurrent
+    -l: loglevel
+    -q: quality
+    -r: don't remove tempdir
+    -t: tempdir
     '''
     global optdict
-    optlist, args = getopt.getopt(sys.argv[1:], 'cfj:h')
+    optlist, args = getopt.getopt(sys.argv[1:], 'hj:l:q:rt:')
     optdict = dict(optlist)
-    if '-h' in optdict or not args:
+    if '-h' in optdict:
         print main.__doc__
         return
 
-    optdict.setdefault('-j', '4')
-    for arg in args: trans_lz(arg)
+    loglevel = 'INFO'
+    if '-l' in optdict:
+        loglevel = optdict.get('-l')
+    logging.basicConfig(level=loglevel)
 
-if __name__ == '__main__': main()
+    if optdict.get('-t') == '':
+        optdict['-t'] = os.getcwd()
+    optdict.setdefault('-j', '4')
+    optdict.setdefault('-q', '80')
+
+    for arg in args:
+        proc_comic(arg)
+
+
+if __name__ == '__main__':
+    main()
