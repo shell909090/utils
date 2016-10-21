@@ -43,7 +43,7 @@ def query_dict(words):
     doc = BeautifulSoup(resp.content, 'lxml')
     unfind = doc.find('div', class_='unfind')
     if unfind is not None:
-        raise Exception(unfind.get_text())
+        raise Exception(unfind.get_text().encode('utf-8'))
 
     result = {}
 
