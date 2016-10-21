@@ -81,7 +81,8 @@ def put(src, dst, use_sudo=False):
             fo.write(src.read())
             fo.flush()
             r = f('cp "%s" "%s"' % (fo.name, dst))
-            f('chown root.root "%s"' % dst)
+            if use_sudo:
+                f('chown root.root "%s"' % dst)
             return r
     src = path.expanduser(src)
     return f('cp "%s" "%s"' % (src, dst))
