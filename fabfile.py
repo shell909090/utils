@@ -62,6 +62,10 @@ def edit_remotefile(filepath, use_sudo=False):
 
 
 def find_or_add(s, regex, repl, replace=False):
+    ''' try find regex in s.
+if do, replace original string if flag replace setted, otherwise ignore.
+if not find, add repl to the end. '''
+    regex = re.compile(regex, re.MULTILINE)
     m = regex.search(s)
     if m:
         if replace:
@@ -81,10 +85,9 @@ def repl_rlinput(line, prompt, default):
             d = default
             if m:
                 g = m.groups()
-                if g:
+                if g and g[0]:
                     d = g[0]
-            v = rlinput(prompt, d).strip()
-            cache['value'] = v
+            cache['value'] = rlinput(prompt, d).strip()
         return line % cache['value']
     return repl
 
@@ -155,7 +158,7 @@ def set_ports(name, protocol, iptables_cmd, default):
 def iptables():
     with hide('stdout'):
         rules = sudo('iptables -n -v -L INPUT')
-    tcpports = ';'.join(get_port_list(rules, 'tcp'))
+    tcpports = ';'.join(get_port_list(rules, 'tcp')) or '22'
     udpports = ';'.join(get_port_list(rules, 'udp'))
     sudo('iptables -P INPUT ACCEPT')
     sudo('iptables -F INPUT')
@@ -175,7 +178,7 @@ def iptables():
 def ip6tables():
     with hide('stdout'):
         rules = sudo('ip6tables -n -v -L INPUT')
-    tcpports = ';'.join(get_port_list(rules, 'tcp'))
+    tcpports = ';'.join(get_port_list(rules, 'tcp')) or '22'
     udpports = ';'.join(get_port_list(rules, 'udp'))
     sudo('ip6tables -P INPUT ACCEPT')
     sudo('ip6tables -F INPUT')
@@ -237,19 +240,19 @@ def sysutils():
 def ssh_secure(content):
     content = find_or_add(
         content,
-        re.compile(r'^[# ]*KexAlgorithms\s*(\S+)$', re.MULTILINE),
+        r'^[# ]*KexAlgorithms\s*(\S+)$',
         'KexAlgorithms curve25519-sha256@libssh.org,\
 diffie-hellman-group-exchange-sha256',
         replace=True)
     content = find_or_add(
         content,
-        re.compile(r'^[# ]*Ciphers\s*(\S+)$', re.MULTILINE),
+        r'^[# ]*Ciphers\s*(\S+)$',
         'Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,\
 aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr',
         replace=True)
     content = find_or_add(
         content,
-        re.compile(r'^[# ]*MACs\s*(\S+)$', re.MULTILINE),
+        r'^[# ]*MACs\s*(\S+)$',
         'MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,\
 hmac-ripemd160-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,\
 hmac-sha2-256,hmac-ripemd160,umac-128@openssh.com',
@@ -263,17 +266,17 @@ def sshd_config():
         content = buf.getvalue()
         content = find_or_add(
             content,
-            re.compile(r'^[# ]*PasswordAuthentication\s*(\S+)$', re.MULTILINE),
+            r'^[# ]*PasswordAuthentication\s*(\S+)$',
             'PasswordAuthentication no',
             replace=True)
         content = find_or_add(
             content,
-            re.compile(r'^[# ]*PermitRootLogin\s*(\S+)$', re.MULTILINE),
+            r'^[# ]*PermitRootLogin\s*(\S+)$',
             'PermitRootLogin no',
             replace=True)
         content = find_or_add(
             content,
-            re.compile(r'^[# ]*UseDNS\s*(\S+)$', re.MULTILINE),
+            r'^[# ]*UseDNS\s*(\S+)$',
             'UseDNS no',
             replace=True)
         content = ssh_secure(content)
@@ -295,12 +298,12 @@ def user_env():
         content = buf.getvalue()
         content = find_or_add(
             content,
-            re.compile('^PATH=(.*)$', re.MULTILINE),
+            r'^PATH=(.*)$',
             'PATH="/usr/local/sbin:/usr/local/bin:\
 /usr/sbin:/usr/bin:/sbin:/bin:~/bin"')
         content = find_or_add(
             content,
-            re.compile('^export EDITOR=(.*)$', re.MULTILINE),
+            r'^export EDITOR="?([^"]*)"?$',
             repl_rlinput('export EDITOR="%s"',
                          'editor: ', config['editor']))
         buf.seek(0, os.SEEK_SET)
@@ -367,25 +370,25 @@ def ssh_config():
         content = buf.getvalue()
         content = find_or_add(
             content,
-            re.compile(r'^[# ]*ControlMaster\s*(\S+)$', re.MULTILINE),
+            r'^[# ]*ControlMaster\s*(\S+)$',
             repl_rlinput('ControlMaster\t%s',
                          'ControlMaster: ', config['ControlMaster']),
             replace=True)
         content = find_or_add(
             content,
-            re.compile(r'^[# ]*ControlPath\s*(\S+)$', re.MULTILINE),
+            r'^[# ]*ControlPath\s*(\S+)$',
             'ControlPath\t/tmp/ssh_mux_%h_%p_%r')
         content = find_or_add(
             content,
-            re.compile(r'^[# ]*ControlPersist\s*(\S+)$', re.MULTILINE),
+            r'^[# ]*ControlPersist\s*(\S+)$',
             'ControlPersist\t10m')
         content = find_or_add(
             content,
-            re.compile(r'^[# ]*ServerAliveInterval\s*(\S+)$', re.MULTILINE),
+            r'^[# ]*ServerAliveInterval\s*(\S+)$',
             'ServerAliveInterval\t30')
         content = find_or_add(
             content,
-            re.compile(r'^[# ]*ForwardAgent\s*(\S+)$', re.MULTILINE),
+            r'^[# ]*ForwardAgent\s*(\S+)$',
             'ForwardAgent\tno')
         # those config must on the top of the file.
         # otherwise they may be just work for lastest 'Host',
