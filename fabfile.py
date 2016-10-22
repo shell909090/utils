@@ -78,11 +78,11 @@ def repl_rlinput(line, prompt, default):
 
     def repl(m):
         if 'value' not in cache:
-            g = m.groups()
-            if g:
-                d = g[0]
-            else:
-                d = default
+            d = default
+            if m:
+                g = m.groups()
+                if g:
+                    d = g[0]
             v = rlinput(prompt, d).strip()
             cache['value'] = v
         return line % cache['value']
