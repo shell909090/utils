@@ -208,6 +208,12 @@ def service():
 
 
 @task
+def chtz_sh():
+    sudo('echo "Asia/Shanghai" > /etc/timezone')
+    sudo('DEBIAN_FRONTEND=noninteractive dpkg-reconfigure tzdata')
+
+
+@task
 def sysctl():
     netconf = '/etc/sysctl.d/net.conf'
     buf = StringIO.StringIO(b'''\
@@ -294,13 +300,14 @@ def emacscfg():
 
 @task
 def user_env():
+    homedir = str(run("dirname ~/.bashrc")).strip()
     with edit_remotefile('~/.bashrc') as buf:
         content = buf.getvalue()
         content = find_or_add(
             content,
             r'^PATH=(.*)$',
             'PATH="/usr/local/sbin:/usr/local/bin:\
-/usr/sbin:/usr/bin:/sbin:/bin:~/bin"')
+/usr/sbin:/usr/bin:/sbin:/bin:%s/bin"' % homedir)
         content = find_or_add(
             content,
             r'^export EDITOR="?([^"]*)"?$',
