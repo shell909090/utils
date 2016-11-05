@@ -12,12 +12,10 @@ import os
 import re
 import readline
 import StringIO
-from contextlib import contextmanager
 if __name__ == '__main__':
     from fakefab import env, sudo, run, get, put, task, hide, settings
 else:
     from fabric.api import env, sudo, run, get, put, task, hide, settings
-    # from fabric.contrib.console import confirm
 
 
 try:
@@ -35,7 +33,27 @@ config = {
     'editor': 'vim',
     'signingkey': '227657F36E169B9041862EBF29A973860914A01A',
     'ControlMaster': 'auto',
+    'apt_source': 'https://mirrors.shell909090.org/debian/',
+    'apt_dest': 'jessie'
 }
+
+
+class RemoteFile(object):
+
+    def __init__(self, filepath, use_sudo=False):
+        self.filepath, self.use_sudo = filepath, use_sudo
+        buf = StringIO.StringIO()
+        with settings(warn_only=True):
+            get(self.filepath, buf, use_sudo=self.use_sudo)
+        self.content = buf.getvalue()
+
+    def update(self):
+        buf = StringIO.StringIO()
+        buf.seek(0, os.SEEK_SET)
+        buf.truncate()
+        buf.write(self.content)
+        buf.seek(0, os.SEEK_SET)
+        put(buf, self.filepath, self.use_sudo)
 
 
 def rlinput(prompt, prefill=''):
@@ -44,21 +62,6 @@ def rlinput(prompt, prefill=''):
         return input(prompt)
     finally:
         readline.set_startup_hook()
-
-
-@contextmanager
-def edit_remotefile(filepath, use_sudo=False):
-    buf = StringIO.StringIO()
-    with settings(warn_only=True):
-        get(filepath, buf, use_sudo=use_sudo)
-    try:
-        yield buf
-    except Exception:
-        raise
-    else:
-        if buf.getvalue():
-            buf.seek(0, os.SEEK_SET)
-        put(buf, filepath, use_sudo)
 
 
 def find_or_add(s, regex, repl, replace=False):
@@ -90,6 +93,41 @@ def repl_rlinput(line, prompt, default):
             cache['value'] = rlinput(prompt, d).strip()
         return line % cache['value']
     return repl
+
+
+def confirm_content(content, filepath='', default=''):
+    print('-----%s-----' % filepath)
+    print(content)
+    print('----------')
+    answer = rlinput('Is this ok? ', default)
+    return answer.lower().startswith('y')
+
+
+@task
+def apt_source():
+    sources_path = '/etc/apt/sources.list'
+    main_repo = re.compile(r'deb\s+(\S+)\s+(\S+)\s+(.*)', re.M)
+    rf = RemoteFile(sources_path, use_sudo=True)
+
+    m = main_repo.search(rf.content)
+    url, dest, components = m.groups()
+    rf.content = find_or_add(
+        rf.content,
+        url,
+        repl_rlinput('%s', 'url: ', url),
+        replace=True)
+    rf.content = find_or_add(
+        rf.content,
+        dest,
+        repl_rlinput('%s', 'destribution: ', dest),
+        replace=True)
+    rf.content = find_or_add(
+        rf.content,
+        components,
+        repl_rlinput('%s', 'components: ', components),
+        replace=True)
+    if confirm_content(rf.content, sources_path, default='y'):
+        rf.update()
 
 
 @task
@@ -239,7 +277,7 @@ def fail2ban():
 @task
 def sysutils():
     for s in ['less', 'vim', 'mtr-tiny', 'sysv-rc-conf',
-              'ifstat', 'iftop', 'sysv-rc-conf']:
+              'ifstat', 'iftop', 'sysv-rc-conf', 'wget']:
         apt_check_and_install(s)
 
 
@@ -268,27 +306,24 @@ hmac-sha2-256,hmac-ripemd160,umac-128@openssh.com',
 
 @task
 def sshd_config():
-    with edit_remotefile('/etc/ssh/sshd_config', use_sudo=True) as buf:
-        content = buf.getvalue()
-        content = find_or_add(
-            content,
-            r'^[# ]*PasswordAuthentication\s*(\S+)$',
-            'PasswordAuthentication no',
-            replace=True)
-        content = find_or_add(
-            content,
-            r'^[# ]*PermitRootLogin\s*(\S+)$',
-            'PermitRootLogin no',
-            replace=True)
-        content = find_or_add(
-            content,
-            r'^[# ]*UseDNS\s*(\S+)$',
-            'UseDNS no',
-            replace=True)
-        content = ssh_secure(content)
-        buf.seek(0, os.SEEK_SET)
-        buf.truncate()
-        buf.write(content)
+    rf = RemoteFile('/etc/ssh/sshd_config', use_sudo=True)
+    rf.content = find_or_add(
+        rf.content,
+        r'^[# ]*PasswordAuthentication\s*(\S+)$',
+        'PasswordAuthentication no',
+        replace=True)
+    rf.content = find_or_add(
+        rf.content,
+        r'^[# ]*PermitRootLogin\s*(\S+)$',
+        'PermitRootLogin no',
+        replace=True)
+    rf.content = find_or_add(
+        rf.content,
+        r'^[# ]*UseDNS\s*(\S+)$',
+        'UseDNS no',
+        replace=True)
+    rf.content = ssh_secure(rf.content)
+    rf.update()
 
 
 @task
@@ -301,21 +336,19 @@ def emacscfg():
 @task
 def user_env():
     homedir = str(run("dirname ~/.bashrc")).strip()
-    with edit_remotefile('~/.bashrc') as buf:
-        content = buf.getvalue()
-        content = find_or_add(
-            content,
-            r'^PATH=(.*)$',
-            'PATH="/usr/local/sbin:/usr/local/bin:\
-/usr/sbin:/usr/bin:/sbin:/bin:%s/bin"' % homedir)
-        content = find_or_add(
-            content,
-            r'^export EDITOR="?([^"]*)"?$',
-            repl_rlinput('export EDITOR="%s"',
-                         'editor: ', config['editor']))
-        buf.seek(0, os.SEEK_SET)
-        buf.truncate()
-        buf.write(content)
+    prefixes = ['/usr/local', '/usr', '/', homedir]
+    env_path = 'PATH="%s"' % ['%s/sbin:%s/bin' for p in prefixes]
+
+    rf = RemoteFile('~/.bashrc')
+    rf.content = find_or_add(
+        rf.content,
+        r'^PATH=(.*)$',
+        env_path)
+    rf.content = find_or_add(
+        rf.content,
+        r'^export EDITOR="?([^"]*)"?$',
+        repl_rlinput('export EDITOR="%s"', 'editor: ', config['editor']))
+    rf.update()
 
 
 GITCFG = '''[user]
@@ -373,37 +406,34 @@ def pubkey():
 
 @task
 def ssh_config():
-    with edit_remotefile('~/.ssh/config') as buf:
-        content = buf.getvalue()
-        content = find_or_add(
-            content,
-            r'^[# ]*ControlMaster\s*(\S+)$',
-            repl_rlinput('ControlMaster\t%s',
-                         'ControlMaster: ', config['ControlMaster']),
-            replace=True)
-        content = find_or_add(
-            content,
-            r'^[# ]*ControlPath\s*(\S+)$',
-            'ControlPath\t/tmp/ssh_mux_%h_%p_%r')
-        content = find_or_add(
-            content,
-            r'^[# ]*ControlPersist\s*(\S+)$',
-            'ControlPersist\t10m')
-        content = find_or_add(
-            content,
-            r'^[# ]*ServerAliveInterval\s*(\S+)$',
-            'ServerAliveInterval\t30')
-        content = find_or_add(
-            content,
-            r'^[# ]*ForwardAgent\s*(\S+)$',
-            'ForwardAgent\tno')
-        # those config must on the top of the file.
-        # otherwise they may be just work for lastest 'Host',
-        # not all of them.
-        # content = ssh_secure(content)
-        buf.seek(0, os.SEEK_SET)
-        buf.truncate()
-        buf.write(content)
+    rf = RemoteFile('~/.ssh/config')
+    rf.content = find_or_add(
+        rf.content,
+        r'^[# ]*ControlMaster\s*(\S+)$',
+        repl_rlinput('ControlMaster\t%s',
+                     'ControlMaster: ', config['ControlMaster']),
+        replace=True)
+    rf.content = find_or_add(
+        rf.content,
+        r'^[# ]*ControlPath\s*(\S+)$',
+        'ControlPath\t/tmp/ssh_mux_%h_%p_%r')
+    rf.content = find_or_add(
+        rf.content,
+        r'^[# ]*ControlPersist\s*(\S+)$',
+        'ControlPersist\t10m')
+    rf.content = find_or_add(
+        rf.content,
+        r'^[# ]*ServerAliveInterval\s*(\S+)$',
+        'ServerAliveInterval\t30')
+    rf.content = find_or_add(
+        rf.content,
+        r'^[# ]*ForwardAgent\s*(\S+)$',
+        'ForwardAgent\tno')
+    # those config must on the top of the file.
+    # otherwise they may be just work for lastest 'Host',
+    # not all of them.
+    # rf.content = ssh_secure(rf.content)
+    rf.update()
 
 
 def print_help():
@@ -423,6 +453,10 @@ available commands: '''
     optdict = dict(optlist)
     if '-h' in optdict:
         return print_help()
+
+    if not args:
+        print_help()
+        return
 
     f = globals().get(args[0], print_help)
     f()
