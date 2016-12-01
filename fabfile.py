@@ -24,8 +24,9 @@ except NameError:
     pass
 
 
+env.use_ssh_config = True
 env.roledefs['debox'] = ['srv', 'web', 'pub', 'debox']
-env.roledefs['vps'] = ['buyvm', ]
+env.roledefs['vps'] = ['buyvm', 'do1']
 
 config = {
     'name': 'Xu ZhiXiang (Shell.E.Xu)',
@@ -277,7 +278,7 @@ def fail2ban():
 @task
 def sysutils():
     for s in ['less', 'vim', 'mtr-tiny', 'sysv-rc-conf',
-              'ifstat', 'iftop', 'sysv-rc-conf', 'wget']:
+              'ifstat', 'iftop', 'wget']:
         apt_check_and_install(s)
 
 
