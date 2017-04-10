@@ -25,8 +25,10 @@ except NameError:
 
 
 env.use_ssh_config = True
-env.roledefs['debox'] = ['srv', 'web', 'pub', 'elk', 'grafana', 'jupyter', 'debox']
-env.roledefs['vps'] = ['buyvm', 'do1']
+env.roledefs['debox'] = [
+    'srv', 'web', 'pub', 'elk', 'grafana', 'jupyter', 'debox']
+env.roledefs['vps'] = [
+    'buyvm', 'do1', 'vlt1']
 
 
 config = {
