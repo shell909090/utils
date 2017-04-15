@@ -389,8 +389,10 @@ def git_config():
 @task
 def pubkey():
     pubkeys = [
-        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIANXSjD8YRhbmqr5tyjwQIRnqi4BMGY2CPbiGf\
-/3EvWf shell@201602',
+        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIANXSjD8YRh\
+bmqr5tyjwQIRnqi4BMGY2CPbiGf/3EvWf shell@201602',
+        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJMb4giDpPu\
+Vu0qi6YT9KhoK/dIidy6TE4OlocuchWFR mobile@201602'
     ]
 
     run('mkdir -p ~/.ssh/')
