@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# 1. search keyword in locate
+# 2. show result to user and get the selection
+# 3. jump into it.
+cdjump() {
+    local prefix=$1
+    local result
+    local line
+    local num
+    local k=0
+
+    for line in $(mlocate $prefix)
+    do
+	if [ -z $(echo "$line" | grep "$prefix.*/") ] && [ -d "$line" ]
+	then
+	    result[k++]="$line"
+	fi
+    done
+
+    select num in ${result[*]};
+    do
+    	cd $num
+	break
+    done
+}
+
+gitclone() {
+    local url
+    url="$1"
+    url=${url::-4} # remove .git in tail
+
+    if [ ${url::4} = "http" ]; then
+	# https://github.com/shell909090/goproxy.git
+	url=$(echo "$url" | awk -F:// '{print $2}')
+    else
+	# git@github.com:shell909090/emacscfg.git
+	url=$(echo "$url" | awk -F@ '{gsub(/:/,"/",$2); print $2}') # split @ and replace : to /
+    fi
+
+    mkdir -p ~/workspace/"$url"
+    cd $(dirname ~/workspace/"$url")
+    git clone "$1"
+    cd ~/workspace/"$url"
+}
