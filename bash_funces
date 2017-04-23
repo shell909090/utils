@@ -28,7 +28,10 @@ cdjump() {
 gitclone() {
     local url
     url="$1"
-    url=${url::-4} # remove .git in tail
+
+    if [ ${url::-4} = ".git" ]; then
+	url=${url::-4} # remove .git in tail
+    fi
 
     if [ ${url::4} = "http" ]; then
 	# https://github.com/shell909090/goproxy.git
