@@ -29,7 +29,7 @@ gitclone() {
     local url
     url="$1"
 
-    if [ ${url::-4} = ".git" ]; then
+    if [ ${url: -4} = ".git" ]; then
 	url=${url::-4} # remove .git in tail
     fi
 
