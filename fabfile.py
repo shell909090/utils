@@ -407,7 +407,7 @@ Vu0qi6YT9KhoK/dIidy6TE4OlocuchWFR mobile@201602'
             r = run('grep "%s" ~/.ssh/authorized_keys' % key)
             if r.succeeded:
                 continue
-        run('echo "%s" > ~/.ssh/authorized_keys' % key)
+        run('echo "%s" >> ~/.ssh/authorized_keys' % key)
 
 
 @task
