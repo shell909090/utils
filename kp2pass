@@ -1,0 +1,87 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+'''
+@date: 2017-04-26
+@author: Shell.Xu
+@copyright: 2017, Shell.Xu <shell909090@gmail.com>
+@license: BSD-3-clause
+'''
+from __future__ import absolute_import, division,\
+    print_function, unicode_literals
+import os
+import sys
+import getopt
+import shutil
+import getpass
+import logging
+import cStringIO
+import subprocess
+from os import path
+
+from pykeepass import PyKeePass
+
+
+def escape(s):
+    return s.replace(" ", "-").replace("&", "and").\
+        replace("[", "").replace("]", "")
+
+
+def gen_pass_data(entry):
+    buf = cStringIO.StringIO()
+    if entry.password:
+        buf.write(entry.password.encode('utf-8') + b'\n')
+    if entry.username:
+        buf.write(b'username: %s\n' % entry.username.encode('utf-8'))
+    if entry.url:
+        buf.write(b'url: %s\n' % entry.url.encode('utf-8'))
+    if entry.notes:
+        buf.write(b'comment: %s\n' % entry.notes.encode('utf-8'))
+    return buf.getvalue()
+
+
+def clean_pass_dir():
+    rootdir = optdict.get('-r', '~/.password-store/')
+    rootdir = path.expanduser(rootdir)
+    for name in os.listdir(rootdir):
+        if name.startswith('.'):
+            continue
+        filepath = path.join(rootdir, name)
+        logging.info('clean %s', filepath)
+        shutil.rmtree(filepath)
+
+
+def create_pass_entry(entry_path, content):
+    p = subprocess.Popen(
+        ['pass', 'insert', '--multiline', '--force',
+         entry_path.encode('utf-8')],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    p.communicate(content)
+    p.wait()
+
+
+def main():
+    global optdict
+    optlist, args = getopt.getopt(sys.argv[1:], 'chl:p:r:')
+    optdict = dict(optlist)
+    if '-h' in optdict:
+        print(main.__doc__)
+        return
+
+    logging.basicConfig(level=optdict.get('-l', 'INFO'))
+
+    kp_filepath = path.expanduser(args[0])
+    passwd = optdict.get('-p') or getpass.getpass()
+    kp = PyKeePass(kp_filepath, passwd)
+
+    if '-c' in optdict:
+        clean_pass_dir()
+
+    for group in kp.groups:
+        for entry in group.entries:
+            entry_path = escape('%s/%s' % (group.path, entry.title))
+            logging.info('import %s', entry_path)
+            create_pass_entry(entry_path, gen_pass_data(entry))
+
+
+if __name__ == '__main__':
+    main()

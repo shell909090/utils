@@ -22,6 +22,7 @@ install-bin:
 	ln -s `pwd`/anki.py ~/bin/anki.py
 	ln -s `pwd`/bm.py ~/bin/bm.py
 	ln -s `pwd`/dictcn.py ~/bin/dictcn.py
+	ln -s `pwd`/kp2pass ~/bin/kp2pass
 	ln -s `pwd`/md2slide ~/bin/md2slide
 	ln -s `pwd`/packpy ~/bin/packpy
 	ln -s `pwd`/scandeb ~/bin/scandeb
@@ -31,6 +32,7 @@ clean-bin:
 	rm -f ~/bin/anki.py
 	rm -f ~/bin/bm.py
 	rm -f ~/bin/dictcn.py
+	rm -f ~/bin/kp2pass
 	rm -f ~/bin/md2slide
 	rm -f ~/bin/packpy
 	rm -f ~/bin/scandeb
