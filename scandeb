@@ -38,30 +38,40 @@ release是代号，例如stable/testing/unstable。
 category是仓库分类，例如main/contrib/non-free。
 
 '''
-import os, sys, getopt, shutil, subprocess
+import os
+import sys
+import getopt
+import shutil
+import subprocess
 from os import path
+
 
 def os_safe(f, p):
     try: f(p)
     except OSError: pass
 
+
 def findfile(basepath):
     for base, dirs, files in os.walk(basepath):
         for f in files: yield path.join(base, f)
 
+
 def scan_for_arches(dirname):
     return set(map(lambda n: path.splitext(n)[0].split('_')[-1], findfile(dirname)))
+
 
 def scan_dir(base, release, category, arch):
     os_safe(os.makedirs, path.join(base, 'dists', release, category, 'binary-%s' % arch))
     srcpath = path.join(base, 'pool', release)
     destpath = path.join(base, 'dists', release, category,
-                         'binary-%s' % arch, 'Packages.gz')
+                         'binary-%s' % arch, 'Packages')
     with open(destpath, 'wb') as fo:
-        p1 = subprocess.Popen(['apt-ftparchive', 'packages', '-a', arch, srcpath], stdout=fo)
-        # stdout=subprocess.PIPE)
+        p1 = subprocess.Popen(['apt-ftparchive', 'packages', '-a', arch, srcpath],
+                              stdout=fo)
+                              # stdout=subprocess.PIPE)
         # p2 = subprocess.Popen(['gzip', '-9c'], stdin=p1.stdout, stdout=fo)
-        return p1.wait() or p2.wait()
+        return p1.wait()  # or p2.wait()
+
 
 def archive_release(base, release):
     release_dir = path.join(base, 'dists', release)
@@ -74,6 +84,7 @@ def archive_release(base, release):
             '-o', 'APT::FTPArchive::Release::Origin=shell',
             '-o', 'APT::FTPArchive::Release::Codename=%s' % release], stdout=fo).wait()
 
+
 def scan_pool(base, category):
     for release in os.listdir(path.join(base, 'pool')):
         release_dir = path.join(base, 'pool', release)
@@ -81,18 +92,22 @@ def scan_pool(base, category):
             scan_dir(base, release, category, arch)
         archive_release(base, release)
 
+
 def sign_dist(base, user=None):
     for release in os.listdir(path.join(base, 'pool')):
         release_path = path.join(base, 'dists', release, 'Release')
-        cmds = ['gpg', '-abs', '-o', release_path + '.gpg', release_path]
-        if user: cmds.extend(['-u', user])
+        cmds = ['gpg2', '-abs', '-o', release_path + '.gpg', release_path]
+        if user:
+            cmds.extend(['-u', user])
         subprocess.Popen(cmds).wait()
+
 
 def scan_path(base):
     os_safe(shutil.rmtree, path.join(base, 'dists'))
     scan_pool(base, optdict.get('-c', 'main'))
     if '-s' in optdict:
         sign_dist(base, optdict.get('-u'))
+
 
 def main():
     '''
@@ -102,7 +117,7 @@ def main():
     -c: category, default is main
     -h: help
     -s: sign dist
-    -u: sign with username, pass to gpg
+    -u: sign with username, pass to gpg2
     '''
     global optdict
     optlist, args = getopt.getopt(sys.argv[1:], 'c:hsu:')
@@ -112,7 +127,11 @@ def main():
         return
 
     if len(args) != 0:
-        for p in args: scan_path(p)
-    else: scan_path(os.getcwd())
+        for p in args:
+            scan_path(p)
+    else:
+        scan_path(os.getcwd())
 
-if __name__ == '__main__': main()
+
+if __name__ == '__main__':
+    main()
