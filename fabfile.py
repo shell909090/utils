@@ -340,8 +340,9 @@ def emacscfg():
 @task
 def user_env():
     homedir = str(run("dirname ~/.bashrc")).strip()
-    prefixes = ['/usr/local', '/usr', '/', homedir]
-    env_path = 'PATH="%s"' % ['%s/sbin:%s/bin' for p in prefixes]
+    prefixes = ['/usr/local', '/usr', '', ]
+    pathes = ':'.join(['%s/sbin:%s/bin' % (p, p) for p in prefixes])
+    env_path = 'PATH="%s:%s/bin"' % (pathes, homedir)
 
     rf = RemoteFile('~/.bashrc')
     rf.content = find_or_add(
@@ -352,6 +353,21 @@ def user_env():
         rf.content,
         r'^export EDITOR="?([^"]*)"?$',
         repl_rlinput('export EDITOR="%s"', 'editor: ', config['editor']))
+    rf.update()
+
+
+@task
+def deb_env():
+    rf = RemoteFile('~/.bashrc')
+    rf.content = find_or_add(
+        rf.content,
+        '^export DEBEMAIL=(.*)$',
+        repl_rlinput('export DEBEMAIL="%s"', 'deb email: ', config['email']))
+    rf.content = find_or_add(
+        rf.content,
+        '^export DEBFULLNAME=(.*)$',
+        repl_rlinput('export DEBFULLNAME="%s"',
+                     'deb fullname: ', config['name']))
     rf.update()
 
 
