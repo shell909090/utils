@@ -26,7 +26,7 @@ except NameError:
 
 env.use_ssh_config = True
 env.roledefs['debox'] = [
-    'srv', 'web', 'pub', 'elk', 'grafana', 'jupyter', 'debox']
+    'srv', 'web', 'pub', 'router', 'debox']
 env.roledefs['vps'] = [
     'buyvm', 'do1', 'vlt1']
 
@@ -267,6 +267,7 @@ net.core.wmem_default = 655360
 net.core.wmem_max = 16777216
 net.ipv4.tcp_rmem = 4096	2621440	16777216
 net.ipv4.tcp_wmem = 4096	655360	16777216
+net.ipv4.tcp_retries2 = 5
 ''')
     put(buf, netconf, use_sudo=True)
     sudo('chown root.root %s' % netconf)
