@@ -267,7 +267,7 @@ net.core.wmem_default = 655360
 net.core.wmem_max = 16777216
 net.ipv4.tcp_rmem = 4096	2621440	16777216
 net.ipv4.tcp_wmem = 4096	655360	16777216
-net.ipv4.tcp_retries2 = 5
+net.ipv4.tcp_retries2 = 8
 ''')
     put(buf, netconf, use_sudo=True)
     sudo('chown root.root %s' % netconf)
