@@ -110,7 +110,7 @@ def confirm_content(content, filepath='', default=''):
 @task
 def apt_source():
     sources_path = '/etc/apt/sources.list'
-    main_repo = re.compile(r'deb\s+(\S+)\s+(\S+)\s+(.*)', re.M)
+    main_repo = re.compile(r'^deb\s+(\S+)\s+(\S+)\s+(.*)', re.M)
     rf = RemoteFile(sources_path, use_sudo=True)
 
     m = main_repo.search(rf.content)
@@ -259,7 +259,7 @@ def chtz_sh():
 def sysctl():
     netconf = '/etc/sysctl.d/net.conf'
     buf = StringIO.StringIO(b'''\
-net.ipv4.tcp_congestion_control = htcp
+net.ipv4.tcp_congestion_control = bbr
 
 net.core.rmem_default = 2621440
 net.core.rmem_max = 16777216
@@ -281,8 +281,7 @@ def fail2ban():
 
 @task
 def sysutils():
-    for s in ['less', 'vim', 'mtr-tiny', 'sysv-rc-conf',
-              'ifstat', 'iftop', 'wget']:
+    for s in ['less', 'vim', 'mtr-tiny', 'ifstat', 'iftop', 'wget']:
         apt_check_and_install(s)
 
 
