@@ -26,9 +26,9 @@ except NameError:
 
 env.use_ssh_config = True
 env.roledefs['debox'] = [
-    'srv', 'web', 'pub', 'router', 'debox']
+    'srv', 'web', 'pub', 'nextcloud', 'debox', 'router']
 env.roledefs['vps'] = [
-    'buyvm', 'do1', 'vlt1']
+    'vlt1',]
 
 
 config = {
