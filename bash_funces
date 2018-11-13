@@ -33,8 +33,8 @@ gitclone() {
 	url=${url::${#url}-4} # remove .git in tail
     fi
 
-    if [ ${url::4} = "http" ]; then
-	# https://github.com/shell909090/goproxy.git
+    if [[ "$url" == *"://"* ]]; then 
+	# {scheme}://github.com/shell909090/goproxy.git
 	url=$(echo "$url" | awk -F:// '{print $2}')
     else
 	# git@github.com:shell909090/emacscfg.git
