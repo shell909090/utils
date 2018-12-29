@@ -1,9 +1,13 @@
 #!/bin/bash
 
-rm -f "$1.tar.gz.gpg"
-TMPDIR=`ssh "$1" "mktemp -d"`
+TGT="$1"
+if [[ "$TGT" == *.tar.gz.gpg ]]; then
+    TGT=${TGT::-11}
+fi
+rm -f "$TGT.tar.gz.gpg"
+TMPDIR=`ssh "$TGT" "mktemp -d"`
 echo "create tempdir $TMPDIR"
-ssh "$1" <<EOF
+ssh "$TGT" <<EOF
 cd $TMPDIR
 apt-mark showmanual > apt-mark-manual.lst
 dpkg -l > dpkg.lst
@@ -13,5 +17,5 @@ test -x ~/backup.sh && tar uf backup.tar ~/backup.sh
 test -x ~/backup.sh && ~/backup.sh
 sudo chown $SUDO_UID.$SUDO_GID backup.tar
 EOF
-ssh "$1" "gzip -c $TMPDIR/backup.tar" | gpg -e > "$1.tar.gz.gpg"
-ssh "$1" "rm -rf \"$TMPDIR\""
+ssh "$TGT" "gzip -c $TMPDIR/backup.tar" | gpg -e > "$TGT.tar.gz.gpg"
+ssh "$TGT" "rm -rf \"$TMPDIR\""
