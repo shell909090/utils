@@ -46,3 +46,15 @@ gitclone() {
     git clone "$1"
     cd ~/workspace/"$url"
 }
+
+kcenv() {
+    local rc=~/.aukuberc
+    local env=$1
+
+    export KUBECONFIG=~/.kube/config-$env
+    echo export KUBECONFIG=~/.kube/config-$env > "$rc"
+}
+
+initdocker() {
+    eval $(docker-machine env default)
+}
