@@ -41,10 +41,10 @@ gitclone() {
 	url=$(echo "$url" | awk -F@ '{gsub(/:/,"/",$2); print $2}') # split @ and replace : to /
     fi
 
-    mkdir -p ~/workspace/"$url"
-    cd $(dirname ~/workspace/"$url")
+    mkdir -p ~/src/"$url"
+    cd $(dirname ~/src/"$url")
     git clone "$1"
-    cd ~/workspace/"$url"
+    cd ~/src/"$url"
 }
 
 kcenv() {
