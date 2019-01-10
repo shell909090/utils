@@ -105,6 +105,7 @@ def ipXtables(name, cmd, tgtfile):
     do('/etc/init.d/iptables-persistent flush')
     do('%s -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT' % cmd)
     do('%s -A INPUT -i lo -j ACCEPT' % cmd)
+    do('%s -A INPUT -p icmp -m icmp --icmp-type 8 -j ACCEPT' % cmd)
     for p in accept_ports.split(';'):
         if '-' in p or ',' in p:
             do('%s -A INPUT -p tcp -m multiport --dports %s -j ACCEPT' % (cmd, p))
@@ -127,7 +128,7 @@ def ip6tables():
 def sysctl():
     ''' setup sysctl. '''
     with open('/etc/sysctl.d/net.conf', 'w+') as fo:
-        fo.write('''net.ipv4.tcp_congestion_control = htcp
+        fo.write('''net.ipv4.tcp_congestion_control = bbr
 
 net.core.rmem_default = 2621440
 net.core.rmem_max = 16777216
