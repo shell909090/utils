@@ -17,5 +17,5 @@ test -x ~/backup.sh && tar uf backup.tar ~/backup.sh
 test -x ~/backup.sh && ~/backup.sh
 sudo chown $SUDO_UID.$SUDO_GID backup.tar
 EOF
-ssh "$TGT" "gzip -c $TMPDIR/backup.tar" | gpg -e > "$TGT.tar.gz.gpg"
+ssh "$TGT" "gzip -c $TMPDIR/backup.tar" | gpg -e -r 0xC9A514BA45DE0475! > "$TGT.tar.gz.gpg"
 ssh "$TGT" "rm -rf \"$TMPDIR\""
