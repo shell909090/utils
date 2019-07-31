@@ -28,7 +28,7 @@ env.use_ssh_config = True
 env.roledefs['debox'] = [
     'srv', 'web', 'pub', 'nextcloud', 'debox', 'router']
 env.roledefs['vps'] = [
-    'vlt1',]
+    'vlt1', 'auus1']
 
 
 config = {
