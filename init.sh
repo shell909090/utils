@@ -11,7 +11,7 @@ _aptsrc() {
 deb http://ftp.cn.debian.org/debian/ buster main contrib non-free
 # deb-src http://ftp.cn.debian.org/debian/ buster main contrib non-free
 
-deb http://mirrors.ustc.edu.cn/debian/ buster main contrib non-free
+# deb http://mirrors.ustc.edu.cn/debian/ buster main contrib non-free
 # deb-src http://mirrors.ustc.edu.cn/debian/ buster main contrib non-free
 
 deb http://security.debian.org/debian-security buster/updates main contrib non-free
@@ -32,7 +32,7 @@ _aptinst() {
 set-ssh-config() {
     key="$1"
     value="$2"
-    sed -i "s/^\W*$key [a-zA-Z ]*/$key $value/" "$CFG"
+    sed -i "s/^\W*$key [^\.,]*/$key $value/" "$CFG"
     if ! grep "$key $value" "$CFG" > /dev/null
     then
 	echo "$key $value" >> "$CFG"
@@ -42,6 +42,7 @@ set-ssh-config() {
 _sshd-config() {
     CFG=/etc/ssh/sshd_config
     set-ssh-config "PasswordAuthentication" "no"
+    set-ssh-config "PermitEmptyPasswords" "no"
     set-ssh-config "PermitRootLogin" "no"
     set-ssh-config "UseDNS" "no"
 }
@@ -51,7 +52,7 @@ _sshd-hostkey() {
     dpkg-reconfigure openssh-server
 }
 
-_ipXtables() {
+ipXtables() {
     read -p "open ports [$1]: " ports
     if [ -z "$ports" ]; then
 	ports="22"
@@ -74,7 +75,7 @@ _iptables() {
     IPT=iptables
     if [ ! -e /etc/iptables/rules.v4 ]; then
 	aptitude install iptables-persistent
-	_ipXtables ipv4 > /etc/iptables/rules.v4
+	ipXtables ipv4 > /etc/iptables/rules.v4
     fi
 }
 
@@ -82,7 +83,7 @@ _ip6tables() {
     IPT=ip6tables
     if [ ! -e /etc/iptables/rules.v6 ]; then
 	aptitude install iptables-persistent
-	_ipXtables ipv6 > /etc/iptables/rules.v6
+	ipXtables ipv6 > /etc/iptables/rules.v6
     fi
 }
 
