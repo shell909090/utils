@@ -191,7 +191,9 @@ _emacs() {
 _help() {
     declare -F | while read line;
     do
-	echo ${line:12}
+	if [ ${line:11:1} == "_" ]; then
+	    echo ${line:12}
+	fi
     done
 }
 
