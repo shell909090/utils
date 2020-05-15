@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 '''
 @date: 2019-03-16
@@ -11,10 +11,6 @@ from __future__ import absolute_import, division,\
 import sys
 import argparse
 from bs4 import BeautifulSoup
-
-
-reload(sys)
-sys.setdefaultencoding('utf-8')
 
 
 def main():
