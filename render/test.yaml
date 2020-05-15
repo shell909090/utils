@@ -1,0 +1,28 @@
+peers:
+  router:
+    public: router-public
+    private: router-private
+    host: host
+    port: port
+    address: router-address
+    net: 0.0.0.0/0
+    keepalive: 120
+
+  pixel3:
+    public: pixel3-public
+    private: pixel3-private
+    port: port
+    address: pixel3-address
+
+  mac:
+    public: mac-public
+    private: mac-private
+    port: port
+    address: mac-address
+
+  nexus6:
+    public: nexus6-public
+    private: nexus6-private
+    address: nexus6-address
+    port: port
+    disable: 1
