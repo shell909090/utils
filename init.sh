@@ -92,14 +92,13 @@ _sysctl() {
     if [ ! -e $CFG ]; then
 	cat > $CFG <<EOF
 net.ipv4.tcp_congestion_control = bbr
-
 net.core.rmem_default = 2621440
 net.core.rmem_max = 16777216
 net.core.wmem_default = 655360
 net.core.wmem_max = 16777216
 net.ipv4.tcp_rmem = 4096 2621440 16777216
 net.ipv4.tcp_wmem = 4096 655360 16777216
-# net.ipv4.tcp_retries2 = 8
+net.ipv4.tcp_retries2 = 8
 EOF
 	sysctl -p /etc/sysctl.d/net.conf
     fi
