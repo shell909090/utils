@@ -15,14 +15,11 @@ import sys
 
 def main():
     with open(sys.argv[1], 'r') as fi:
-        while True:
-            num = fi.readline().strip()
-            if not num:
-                break
-            ti = fi.readline().strip()
-            ti = ti.split('-->')[0].split(',')[0]
+        for line in fi:
+            if '-->' not in line:
+                continue
+            ti = line.strip().split('-->')[0].split(',')[0]
             s = fi.readline().strip()
-            fi.readline()
             print(f'{ti} {s}')
 
 
