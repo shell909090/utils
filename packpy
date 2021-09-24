@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 '''
 @date: 2012-05-12
@@ -30,27 +30,36 @@ This program is used to compress python source code to unreadable base64 code, a
 import re, sys, zlib, base64, getopt
 from os import path
 
+
 def pack(filepath):
-    with open(filepath, 'r') as fi:
+    with open(filepath, 'rb') as fi:
         r = base64.b64encode(zlib.compress(fi.read(), 9))
     with open(filepath, 'w') as fo:
-        fo.write('''#!/usr/bin/python
-import zlib, base64; eval(compile(zlib.decompress(base64.b64decode("%s")),"","exec"))''' % r)
+        fo.write(f'''#!/usr/bin/python3
+import zlib, base64; eval(compile(zlib.decompress(base64.b64decode("{r.decode('ascii')}")),"","exec"))''')
+
 
 re_exec = re.compile('''eval\(compile\(zlib\.decompress\(base64\.b64decode\("(.*)"\)\),"","exec"\)\)''')
 def unpack(filepath):
     with open(filepath, 'r') as fi:
         r = re_exec.search(fi.read()).groups(1)[0]
-    with open(filepath, 'w') as fo:
+    with open(filepath, 'wb') as fo:
         fo.write(zlib.decompress(base64.b64decode(r)))
 
+
 def help():
-    print '%s v1.0 written by Shell.Xu' % path.basename(sys.argv[0])
-    print '%s [-u] target' % path.basename(sys.argv[0])
+    print(f'{path.basename(sys.argv[0])} v1.0 written by Shell.Xu')
+    print(f'{path.basename(sys.argv[0])} [-u] target')
+
+
+def main():
+    optlist, argv = getopt.getopt(sys.argv[1:], 'u')
+    if not argv:
+        return help()
+    f = unpack if '-u' in dict(optlist) else pack
+    for arg in argv:
+        f(path.expanduser(arg))
+
 
 if __name__ == '__main__':
-    optlist, argv = getopt.getopt(sys.argv[1:], 'u')
-    f = unpack if '-u' in dict(optlist) else pack
-    if argv:
-        for arg in argv: f(path.expanduser(arg))
-    else: help()
+    main()
