@@ -54,7 +54,3 @@ kcenv() {
     export KUBECONFIG=~/.kube/config-$env
     echo export KUBECONFIG=~/.kube/config-$env > "$rc"
 }
-
-initdocker() {
-    eval $(docker-machine env default)
-}
