@@ -13,13 +13,20 @@ python3 srt.py [srt file]
 import sys
 
 
+def read_multi_line(fi):
+    line = fi.readline().strip()
+    while line:
+        yield line
+        line = fi.readline().strip()
+
+
 def main():
     with open(sys.argv[1], 'r') as fi:
         for line in fi:
             if '-->' not in line:
                 continue
             ti = line.strip().split('-->')[0].split(',')[0]
-            s = fi.readline().strip()
+            s = ' '.join(read_multi_line(fi))
             print(f'{ti} {s}')
 
 
