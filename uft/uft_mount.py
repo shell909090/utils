@@ -7,19 +7,15 @@
 @license: BSD-3-clause
 '''
 import os
-import sys
 import gzip
 import json
 import time
 import stat
 import errno
-import logging
-import argparse
-import datetime
 from os import path
 
 from fusepy import FUSE, FuseOSError, Operations, LoggingMixIn
-
+import uft
 
 class UnionFSFile(object):
 
@@ -206,21 +202,6 @@ class Driver(object):
         self.fd.flush()
 
 
-class GoogleDrive(Driver):
-
-    def rename(self, old, new):
-        self.write(f'rclone moveto "{self.root+old}" "{self.root+new}"\n')
-
-    def unlink(self, fp):
-        self.write(f'rclone deletefile "{self.root+fp}"\n')
-
-    def rmdir(self, fp):
-        self.write(f'rclone rmdir "{self.root+fp}"\n')
-
-    def mkdir(self, fp, mode):
-        self.write(f'rclone mkdir "{self.root+fp}"\n')
-
-
 class DiskDrive(Driver):
 
     def rename(self, old, new):
@@ -238,7 +219,6 @@ class DiskDrive(Driver):
 
 class RecordFSOperations(UnionFSOperations):
     driver_class = {
-        'gdrive': GoogleDrive,
         'disk': DiskDrive,
     }
 
@@ -283,3 +263,45 @@ class RecordFSOperations(UnionFSOperations):
             if fp.startswith(fn):
                 for mp in mps:
                     mp.mkdir(fp, mode)
+
+@uft.register_command
+class Mount(object):
+
+    def register(self, parser):
+        parser.add_argument('--record', '-r', help='record operations')
+        parser.add_argument('--underlay', '-u', help='loglevel')
+        parser.add_argument('snapshot', help='snapshot file.')
+        parser.add_argument('mount', help='mount point.')
+
+    def execute(self):
+        global logger
+        logger = self.logger
+        if self.args.record:
+            ufsop = RecordFSOperations(self.args.record)
+        else:
+            ufsop = UnionFSOperations()
+        if self.args.underlay:
+            ufsop.load_fs(self.args.underlay)
+        ufsop.load_snapshot(self.args.snapshot)
+        logger.warning('load done')
+        fuse = FUSE(ufsop, self.args.mount, foreground=True)
+
+
+def main():
+    mnt = Mount()
+
+    import logging
+    import argparse
+    parser = argparse.ArgumentParser()
+    mnt.register(parser)
+    parser.add_argument('--loglevel', '-l', default='warning', help='loglevel')
+    mnt.args = parser.parse_args()
+
+    mnt.logger = logging.getLogger()
+    mnt.logger.setLevel(mnt.args.loglevel.upper())
+
+    mnt.execute()
+
+
+if __name__ == '__main__':
+    main()

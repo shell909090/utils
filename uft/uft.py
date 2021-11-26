@@ -10,11 +10,8 @@ import re
 import os
 import sys
 import json
-import gzip
 import base64
 import hashlib
-import logging
-import argparse
 from os import path
 from datetime import datetime, timezone
 
@@ -78,12 +75,12 @@ class ScanDir(object):
             if not self.args.files_only:
                 for fn in dirs:
                     fp = path.join(root, fn)
-                    logging.info(f'scan dir {fp}')
+                    self.logger.info(f'scan dir {fp}')
                     self.stdout.write(json.dumps(self.scandir(fp), ensure_ascii=False)+'\n')
             if not self.args.dirs_only:
                 for fn in files:
                     fp = path.join(root, fn)
-                    logging.info(f'scan file {fp}')
+                    self.logger.info(f'scan file {fp}')
                     self.stdout.write(json.dumps(self.scanfile(fp), ensure_ascii=False)+'\n')
 
 
@@ -124,7 +121,7 @@ class Search(object):
         pattern = self.args.pattern
         if self.args.ignore_case:
             pattern = pattern.lower()
-        logger.info(f'pattern: {pattern}')
+        self.logger.info(f'pattern: {pattern}')
         r = re.compile(pattern)
 
         for line in self.stdin:
@@ -138,97 +135,10 @@ class Search(object):
                 self.stdout.write(fmtinfo(info)+'\n')
 
 
-@register_command
-class FindDup(object):
-
-    def register(self, parser):
-        parser.add_argument('--snapshot', '-ss', action='append', help='use snapshot file.')
-        parser.add_argument('--no-name', '-nn', action='store_true', help="don't compare by name.")
-        parser.add_argument('--size', '-s', action='store_true', help='compare by size.')
-        parser.add_argument('--mtime', '-m', action='store_true', help='compare by mtime.')
-        parser.add_argument('--hash', '-hh', action='store_true', help='compare by hash.')
-        parser.add_argument('--interactive', '-i', action='store_true', help='interactively remove.')
-        parser.add_argument('--copies', '-c', type=int, default=2, help='at least n copies.')
-
-    def group(self, unique, stdin):
-        for line in stdin:
-            info = json.loads(line.strip())
-            if info.get('isdir'):
-                continue
-            fp = info['path']
-            fn = path.basename(fp)
-            key = []
-            if not self.args.no_name:
-                key.append(fn)
-            if self.args.size:
-                key.append(info['size'])
-            if self.args.mtime:
-                key.append(info['mtime'])
-            if self.args.hash:
-                if 'md5' in info:
-                    key.append(info['md5'])
-                elif 'head_sha256' in info:
-                    key.append(info['head_sha256'])
-            unique.setdefault(tuple(key), []).append(info)
-
-    def select_file(self, v):
-        print('enter you choice to keep: ', end='')
-        s = input().lower()
-        if s in ('all', 'pass', 'a', 'p'):
-            return
-        elif s in ('none', 'n'):
-            exclude = []
-        else:
-            exclude = set(int(c)-1 for c in s.split(','))
-        for i, info in enumerate(v):
-            if i not in exclude:
-                os.unlink(info['path'])
-
-    def execute(self):
-        unique = {}
-        if self.args.snapshot:
-            for snapshot in self.args.snapshot:
-                logger.info(f'load snapshot: {snapshot}')
-                with gzip.open(snapshot) as stdin:
-                    self.group(unique, stdin)
-        else:
-            self.group(unique, self.stdin)
-
-        for k, v in unique.items():
-            if len(v) < self.args.copies:
-                continue
-            self.stdout.write('----------\n')
-            for info in v:  # sort v
-                self.stdout.write(fmtinfo(info)+'\n')
-            if self.args.interactive:
-                self.select_file(v)
-
-
-@register_command
-class Mount(object):
-
-    def register(self, parser):
-        parser.add_argument('--record', '-r', help='record operations')
-        parser.add_argument('--underlay', '-u', help='loglevel')
-        parser.add_argument('snapshot', help='snapshot file.')
-        parser.add_argument('mount', help='mount point.')
-
-    def execute(self):
-        from fusepy import FUSE
-        import uft_mount
-        uft_mount.logger = logger
-        if self.args.record:
-            ufsop = uft_mount.RecordFSOperations(self.args.record)
-        else:
-            ufsop = uft_mount.UnionFSOperations()
-        if self.args.underlay:
-            ufsop.load_fs(self.args.underlay)
-        ufsop.load_snapshot(self.args.snapshot)
-        logger.warning('load done')
-        fuse = FUSE(ufsop, self.args.mount, foreground=True)
-
-
 def main():
+    import logging
+    import argparse
+
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='cmd')
     for name, cmd in CMDS.items():
@@ -236,20 +146,21 @@ def main():
     parser.add_argument('--loglevel', '-l', default='warning', help='loglevel')
     args = parser.parse_args()
 
-    global logger
-    logger = logging.getLogger()
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
-    logger.addHandler(handler)
-    logger.setLevel(args.loglevel.upper())
+    cmd = CMDS[args.cmd]
+    cmd.args = args
+    cmd.stdin, cmd.stdout = sys.stdin, sys.stdout
 
-    if args.cmd in CMDS:
-        cmd = CMDS[args.cmd]
-        cmd.args = args
-        cmd.stdin = sys.stdin
-        cmd.stdout = sys.stdout
-        cmd.execute()
+    cmd.logger = logging.getLogger()
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+    cmd.logger.addHandler(handler)
+    cmd.logger.setLevel(args.loglevel.upper())
+
+    cmd.execute()
 
 
 if __name__ == '__main__':
-    main()
+    import uft
+    import uft_dup
+    import uft_mount
+    uft.main()
