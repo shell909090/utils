@@ -15,9 +15,30 @@ EOF
     fi
 }
 
+_aptproxy() {
+    CFG=/etc/apt/apt.conf.d/98proxy
+    if [ ! -e $CFG ]; then
+	cat > $CFG <<EOF
+Acquire::http::Proxy "http://srv.lan:8118/";
+EOF
+    fi
+}
+
+_aptipv4() {
+    CFG=/etc/apt/apt.conf.d/99force-ipv4
+    if [ ! -e $CFG ]; then
+	cat > $CFG <<EOF
+Acquire::ForceIPv4 "true";
+EOF
+    fi
+}
+
 _aptinst() {
     apt-get install aptitude
-    aptitude install sudo curl less vim mtr-tiny
+    aptitude install sudo less curl wget
+    aptitude install isc-dhcp-client iputils-ping mtr-tiny netcat-openbsd
+    # dnsutils - too big
+    aptitude install vim nano htop tmux
 }
 
 set-ssh-config() {
