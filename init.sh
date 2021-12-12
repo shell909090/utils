@@ -8,18 +8,9 @@ _aptsrc() {
     CFG=/etc/apt/sources.list
     if [ ! -e $CFG ]; then
 	cat > $CFG <<EOF
-deb http://ftp.cn.debian.org/debian/ buster main contrib non-free
-# deb-src http://ftp.cn.debian.org/debian/ buster main contrib non-free
-
-# deb http://mirrors.ustc.edu.cn/debian/ buster main contrib non-free
-# deb-src http://mirrors.ustc.edu.cn/debian/ buster main contrib non-free
-
-deb http://security.debian.org/debian-security buster/updates main contrib non-free
-# deb-src http://security.debian.org/debian-security buster/updates main contrib non-free
-
-# buster-updates, previously known as 'volatile'
-deb http://ftp.cn.debian.org/debian/ buster-updates main contrib non-free
-# deb-src http://ftp.cn.debian.org/debian/ buster-updates main contrib non-free
+deb http://ftp.cn.debian.org/debian/ bullseye main contrib non-free
+deb http://ftp.cn.debian.org/debian/ bullseye-updates main contrib non-free
+deb http://security.debian.org/debian-security bullseye-security main contrib non-free
 EOF
     fi
 }
@@ -134,6 +125,9 @@ _user() {
 _pubkey() {
     mkdir -p ~/.ssh/
     chmod 700 ~/.ssh/
+    if [[ ! -e ~/.ssh/authorized_keys ]]; then
+	touch ~/.ssh/authorized_keys
+    fi
     if ! grep 'shell@201602' ~/.ssh/authorized_keys
     then
 	cat >> ~/.ssh/authorized_keys <<EOF
