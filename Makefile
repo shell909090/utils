@@ -20,7 +20,6 @@ clean-bash:
 install-bin:
 	ln -s `pwd`/7z/7zdes ~/bin/7zdes
 	ln -s `pwd`/7z/7zenc ~/bin/7zenc
-	ln -s `pwd`/7z/7zptocmx ~/bin/7zptocmx
 	ln -s `pwd`/7z/gpg-sign-dir ~/bin/gpg-sign-dir
 	ln -s `pwd`/7z/un7zd ~/bin/un7zd
 	ln -s `pwd`/dictcn.py ~/bin/dictcn.py
@@ -32,7 +31,6 @@ install-bin:
 clean-bin:
 	rm -f ~/bin/7zdes
 	rm -f ~/bin/7zenc
-	rm -f ~/bin/7zptocmx
 	rm -f ~/bin/gpg-sign-dir
 	rm -f ~/bin/un7zd
 	rm -f ~/bin/dictcn.py
