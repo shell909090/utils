@@ -1,0 +1,6 @@
+#!/bin/bash
+
+find . -type f | sort | xargs sha256sum >> SHA256SUM
+sed -i '/SHA256SUM/,$d' SHA256SUM
+gpg --default-key 0xEF534D6FAAE582C4! --clearsign SHA256SUM
+rm SHA256SUM

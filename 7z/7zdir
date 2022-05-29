@@ -1,0 +1,7 @@
+#!/bin/bash
+
+for i in "$@"
+do
+  7z a -ms=off "$i.7z" "$i"
+  rm -rf "$i"
+done

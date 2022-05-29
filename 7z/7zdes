@@ -1,0 +1,12 @@
+#!/bin/bash
+
+CMD="$1"
+shift
+for i in "$@"
+do
+  PWD=$(gpg -d "$i.key.gpg")
+  if [ -f "$i.001" ]; then
+    i="$i.001"
+  fi
+  7z "-p$PWD" "$CMD" "$i"
+done

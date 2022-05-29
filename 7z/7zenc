@@ -1,0 +1,12 @@
+#!/bin/bash
+
+DST="$1"
+shift
+if [ -f "$DST.key.gpg" ]; then
+  PWD=$(gpg -d "$DST.key.gpg")
+else
+  PWD=$(pwgen -s -N 1 24)
+  echo "$PWD" | gpg -e -r 0xC9A514BA45DE0475! >> "$DST.key.gpg"
+fi
+time 7z a "$DST" -ms=off -mhe=on "-p$PWD" -v2g "$@"
+# time 7z a "$DST" -ms=off -mhe=on "-p$PWD" "$@"

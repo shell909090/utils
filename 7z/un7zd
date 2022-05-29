@@ -1,0 +1,12 @@
+#!/bin/bash
+
+for i in "$@"
+do
+  DEST="${i%.*}"  # without .7z
+  mkdir -p "$DEST"
+  PWD=$(gpg -d "$i.key.gpg")
+  if [ -f "$i.001" ]; then
+    i="$i.001"
+  fi
+  7z x "-o$DEST" "-p$PWD" "$i"
+done
