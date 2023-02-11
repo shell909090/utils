@@ -19,7 +19,7 @@ _aptproxy() {
     CFG=/etc/apt/apt.conf.d/98proxy
     if [ ! -e $CFG ]; then
 	cat > $CFG <<EOF
-Acquire::http::Proxy "http://srv.lan:8118/";
+Acquire::http::Proxy "http://web.lan:8118/";
 EOF
     fi
 }

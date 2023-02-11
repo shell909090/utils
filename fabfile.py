@@ -10,7 +10,7 @@ from fabric.api import env, sudo, run, get, put, task, hide, settings
 
 
 env.use_ssh_config = True
-env.roledefs['debox'] = ['srv', 'web', 'pub', 'docker', 'debox', 'router']
+env.roledefs['debox'] = ['srv', 'web', 'pub', 'debox', 'router']
 env.roledefs['vps'] = ['vlt1', 'auus1']
 
 
