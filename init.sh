@@ -4,6 +4,10 @@ NAME="Shell.Xu"
 EMAIL="shell909090@gmail.com"
 EDITOR="vim"
 
+_update() {
+  wget -O init.new 'https://github.com/shell909090/utils/raw/master/init.sh' && mv init.new init.sh && chmod +x init.sh
+}
+
 _aptsrc() {
     CFG=/etc/apt/sources.list
     if [ ! -e $CFG ]; then
