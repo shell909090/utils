@@ -38,11 +38,11 @@ EOF
 }
 
 _aptinst() {
-    apt-get install aptitude
-    aptitude install sudo less curl wget
-    aptitude install isc-dhcp-client iputils-ping mtr-tiny netcat-openbsd
+    apt-get install aptitude -y
+    aptitude install sudo less curl wget -y
+    aptitude install isc-dhcp-client iputils-ping mtr-tiny netcat-openbsd -y
     # dnsutils - too big
-    aptitude install vim nano htop tmux
+    aptitude install vim nano htop tmux -y
 }
 
 set-ssh-config() {
@@ -157,6 +157,11 @@ _pubkey() {
     then
 	cat >> ~/.ssh/authorized_keys <<EOF
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIANXSjD8YRhbmqr5tyjwQIRnqi4BMGY2CPbiGf/3EvWf shell@201602
+EOF
+    fi
+    if ! grep '202302' ~/.ssh/authorized_keys
+    then
+	cat >> ~/.ssh/authorized_keys <<EOF
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMPG3Ci4r5R/coysaSe4Dbsbd+R5lYtXXFVG2Hx2NAIg 202302
 EOF
     fi
