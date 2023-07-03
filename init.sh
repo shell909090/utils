@@ -12,9 +12,9 @@ _aptsrc() {
     CFG=/etc/apt/sources.list
     if [ ! -e $CFG ]; then
 	cat > $CFG <<EOF
-deb http://ftp.cn.debian.org/debian/ bullseye main contrib non-free
-deb http://ftp.cn.debian.org/debian/ bullseye-updates main contrib non-free
-deb http://security.debian.org/debian-security bullseye-security main contrib non-free
+deb http://ftp.cn.debian.org/debian/ bookworm main contrib non-free
+deb http://ftp.cn.debian.org/debian/ bookworm-updates main contrib non-free
+deb http://security.debian.org/debian-security bookworm-security main contrib non-free
 EOF
     fi
 }
@@ -90,7 +90,7 @@ ipXtables() {
 _iptables() {
     IPT=iptables
     if [ ! -e /etc/iptables/rules.v4 ]; then
-	aptitude install iptables-persistent
+	aptitude install -y iptables-persistent
 	ipXtables ipv4 > /etc/iptables/rules.v4
     fi
 }
@@ -98,7 +98,7 @@ _iptables() {
 _ip6tables() {
     IPT=ip6tables
     if [ ! -e /etc/iptables/rules.v6 ]; then
-	aptitude install iptables-persistent
+	aptitude install -y iptables-persistent
 	ipXtables ipv6 > /etc/iptables/rules.v6
     fi
 }
@@ -201,6 +201,11 @@ _git-config() {
         br = branch
         co = checkout
         ci = commit
+	lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+[init]
+	templatedir = ~/.git_template
+[pull]
+	ff = only
 EOF
     fi
 }
