@@ -204,8 +204,11 @@ _git-config() {
 	lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
 [init]
 	templatedir = ~/.git_template
+	defaultBranch = main
 [pull]
 	ff = only
+[push]
+	default = current
 EOF
     fi
 }
@@ -231,7 +234,7 @@ fn="$1"
 shift
 if declare -F "_$fn" > /dev/null
 then
-    "_$fn" $@
+    "_$fn" "$@"
 else
     _help
 fi
