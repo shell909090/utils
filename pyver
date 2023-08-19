@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+'''
+@date: 2023-08-11
+@author: Shell.Xu
+@copyright: 2023, Shell.Xu <shell909090@gmail.com>
+@license: BSD-3-clause
+'''
+import sys
+import json
+import argparse
+
+import git
+import semver
+
+
+def load_tag_map(repo):
+    reversed_tag = {}
+    for tag in repo.tags:
+        if semver.Version.is_valid(tag.name):
+            reversed_tag[tag.commit] = tag.name
+    return reversed_tag
+
+
+def find_version(repo, tags, ci):
+    msg = []
+
+    while True:
+        msg.append(ci.message.splitlines()[0])
+        if ci in tags:
+            return ci, tags[ci], msg
+
+        if len(ci.parents) == 1:
+            ci = ci.parents[0]
+
+        elif len(ci.parents) > 1:
+            dst, tag, msgpath = max([find_version(repo, tags, p) for p in ci.parents], key=lambda x: x[1])
+            return dst, tag, msg+msgpath
+
+        elif len(ci.parents) == 0:
+            return ci, '0.0.0', msg
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--tag-name', '-tn', action='store_true', help='print the name of tag.')
+    parser.add_argument('--tag-id', '-ti', action='store_true', help='print the id of tag.')
+    parser.add_argument('--tag-messages', '-tm', action='store_true', help='print the head of messages in the path.')
+    parser.add_argument('--tag-json', '-tj', action='store_true', help='print the json.')
+    parser.add_argument('--bump-major', '-bM', action='store_true', help='print a tag bumped major.')
+    parser.add_argument('--bump-minor', '-bm', action='store_true', help='print a tag bumped minor.')
+    parser.add_argument('--bump-patch', '-bp', action='store_true', help='print a tag bumped patch.')
+    parser.add_argument('--release-candidate', '-rc', action='store_true', help='print a release candidate tag.')
+    parser.add_argument('rest', nargs='*', type=str)
+    args = parser.parse_args()
+
+    repo = git.Repo()
+
+    tags = load_tag_map(repo)
+
+    ci, tag, msg = find_version(repo, tags, repo.head.commit)
+    msg = msg[:-1]
+
+    if args.tag_name:
+        print(tag)
+    elif args.tag_id:
+        print(ci)
+    elif args.tag_messages:
+        print('\n'.join(msg))
+    elif args.tag_json:
+        print(json.dumps({
+            'commit': ci.hexsha,
+            'tag': tag,
+            'messages': msg,
+        }))
+
+    elif args.bump_major:
+        print(semver.Version.parse(tag).bump_major())
+    elif args.bump_minor:
+        print(semver.Version.parse(tag).bump_minor())
+    elif args.bump_patch:
+        print(semver.Version.parse(tag).bump_patch())
+    elif args.release_candidate:
+        print(f'{semver.Version.parse(tag).bump_patch()}-rc{len(msg)}.{ci.hexsha[:7]}')
+
+
+if __name__ == '__main__':
+    main()
