@@ -15,7 +15,7 @@ tar uf backup.tar apt-mark-manual.lst dpkg.lst ~/service ~/configs
 sudo bash -c 'while read i; do tar uf backup.tar \$i; done' < ~/configs
 test -x ~/backup.sh && tar uf backup.tar ~/backup.sh
 test -x ~/backup.sh && ~/backup.sh
-sudo chown $SUDO_UID.$SUDO_GID backup.tar
+sudo chown $SUDO_UID:$SUDO_GID backup.tar
 EOF
 ssh "$TGT" "gzip -c $TMPDIR/backup.tar" | gpg -e -r 0xC9A514BA45DE0475! > "$TGT.tar.gz.gpg"
 ssh "$TGT" "rm -rf \"$TMPDIR\""
