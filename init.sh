@@ -12,9 +12,10 @@ _aptsrc() {
     CFG=/etc/apt/sources.list
     if [ ! -e $CFG ]; then
 	cat > $CFG <<EOF
-deb http://ftp.cn.debian.org/debian/ bookworm main contrib non-free
-deb http://ftp.cn.debian.org/debian/ bookworm-updates main contrib non-free
-deb http://security.debian.org/debian-security bookworm-security main contrib non-free
+deb http://ftp.cn.debian.org/debian/ bookworm main contrib non-free non-free-firmware
+deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
+deb http://ftp.cn.debian.org/debian/ bookworm-updates main contrib non-free non-free-firmware
+deb http://ftp.cn.debian.org/debian/ bookworm-backports main contrib non-free non-free-firmware
 EOF
     fi
 }
@@ -197,8 +198,11 @@ _git-config() {
 [alias]
         s = status
         st = status
+        sw = switch
+        f = fetch
         d = diff
         br = branch
+	rb = rebase
         co = checkout
         ci = commit
 	lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
