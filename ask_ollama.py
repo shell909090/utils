@@ -7,6 +7,7 @@
 @license: BSD-3-clause
 '''
 import os
+import re
 import sys
 import logging
 import argparse
@@ -25,6 +26,7 @@ def setup_logging(lv):
 
 def get_text_from_url(url):
     from bs4 import BeautifulSoup
+    logging.info(f'get content from url: {url}')
     resp = requests.get(url)
     resp.raise_for_status()
     doc = BeautifulSoup(resp.text, 'html.parser')
@@ -40,6 +42,9 @@ def ask_startpage(query):
         print(a)
 
 
+re_think = re.compile('<think>.*</think>', re.DOTALL)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug', '-d', action='store_true', help='debug mode')
@@ -47,8 +52,9 @@ def main():
     parser.add_argument('--endpoint', '-e', default=os.getenv('OLLAMA_ENDPOINT', 'http://127.0.0.1:11434'), help='ollama endpoint')
     parser.add_argument('--model', '-m', default=os.getenv('CHAT_MODEL', 'deepseek-r1:14b'), help='ollama model')
     parser.add_argument('--max-context-length', '-c', default=16384, type=int, help='maximum context length')
-    parser.add_argument('--file', '-f', help='input file')
-    parser.add_argument('--url', '-u', help='source url')
+    parser.add_argument('--remove-think', '-rt', action='store_true', help='remove think')
+    parser.add_argument('--file', '-f', action='append', help='input file')
+    parser.add_argument('--url', '-u', action='append', help='source url')
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
 
@@ -61,12 +67,14 @@ def main():
         logging.debug(f'command: {command}')
 
     background = []
-    if args.file and path.exists(args.file):
-        with open(args.file) as fi:
-            background.append(fi.read())
-
+    if args.file:
+        for fp in args.file:
+            with open(fp) as fi:
+                logging.info(f'get content from file: {fp}')
+                background.append(fi.read())
     if args.url:
-        background.append(get_text_from_url(args.url))
+        for u in args.url:
+            background.append(get_text_from_url(u))
 
     background = "\n".join(background)
     template = '你是一个个人助理，请阅读<start>到</end>之间的所有内容，帮助用户回答问题。<start>{background}</end>。{command}。'
@@ -74,6 +82,7 @@ def main():
     if args.debug:
         logging.debug(f'prompt: {prompt}')
 
+    logging.info(f'send request to ollama: {args.endpoint} {args.model}')
     resp = requests.post(f'{args.endpoint}/api/generate', json={
         'model': args.model,
         'stream': False,
@@ -85,7 +94,10 @@ def main():
 
     if resp.status_code == 200:
         data = resp.json()
-        print(data['response'])
+        response = data['response']
+        if args.remove_think:
+            response = re_think.sub('', response)
+        print(response)
         logging.info(f"total_duration: {data['total_duration']/(10**9)}, prompt_eval_count: {data['prompt_eval_count']}, prompt_eval_duration: {data['prompt_eval_duration']/(10**9)}, eval_count: {data['eval_count']}, eval_duration: {data['eval_duration']/(10**9)}, speed: {10**9*data['eval_count']/data['eval_duration']}")
     else:
         print(resp.status_code, resp.content)
