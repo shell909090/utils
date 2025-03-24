@@ -35,7 +35,7 @@ def get_text_from_url(url):
 
 def ask_startpage(query):
     from bs4 import BeautifulSoup
-    resp = requests.post(f'https://www.startpage.com/sp/search', data={'query': query, 't': 'device'})
+    resp = requests.post('https://www.startpage.com/sp/search', data={'query': query, 't': 'device'})
     resp.raise_for_status()
     doc = BeautifulSoup(resp.text, 'html.parser')
     for a in doc.find_all('a'):
@@ -51,6 +51,7 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='log level')
     parser.add_argument('--endpoint', '-e', default=os.getenv('OLLAMA_ENDPOINT', 'http://127.0.0.1:11434'), help='ollama endpoint')
     parser.add_argument('--model', '-m', default=os.getenv('CHAT_MODEL', 'deepseek-r1:14b'), help='ollama model')
+    parser.add_argument('--from-input', '-fi', action='store_true', help='read background from stdin')
     parser.add_argument('--max-context-length', '-c', default=16384, type=int, help='maximum context length')
     parser.add_argument('--remove-think', '-rt', action='store_true', help='remove think')
     parser.add_argument('--file', '-f', action='append', help='input file')
@@ -75,6 +76,8 @@ def main():
     if args.url:
         for u in args.url:
             background.append(get_text_from_url(u))
+    if args.from_input:
+        background.append(sys.stdin.read())
 
     background = "\n".join(background)
     template = '你是一个个人助理，请阅读<start>到</end>之间的所有内容，帮助用户回答问题。<start>{background}</end>。{command}。'
@@ -98,7 +101,14 @@ def main():
         if args.remove_think:
             response = re_think.sub('', response)
         print(response)
-        logging.info(f"total_duration: {data['total_duration']/(10**9)}, prompt_eval_count: {data['prompt_eval_count']}, prompt_eval_duration: {data['prompt_eval_duration']/(10**9)}, eval_count: {data['eval_count']}, eval_duration: {data['eval_duration']/(10**9)}, speed: {10**9*data['eval_count']/data['eval_duration']}")
+        # 将所有浮点数输出改为小数点后两位格式
+        duration_total = data['total_duration'] / 10**9
+        prompt_eval_count = data['prompt_eval_count']
+        prompt_eval_duration = data['prompt_eval_duration'] / 10**9
+        eval_count = data['eval_count']
+        eval_duration = data['eval_duration'] / 10**9
+        eval_rate = eval_count / eval_duration
+        logging.info(f'total_duration: {duration_total:.2f}, prompt_eval_count: {prompt_eval_count}, prompt_eval_duration: {prompt_eval_duration:.2f}, eval_count: {eval_count}, eval_duration: {eval_duration:.2f}, eval_rate: {eval_rate:.2f}')
     else:
         print(resp.status_code, resp.content)
 
