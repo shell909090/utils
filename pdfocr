@@ -1,0 +1,10 @@
+#!/bin/bash
+
+lang="$1"
+tmpdir=$(basename "$2" .pdf)
+
+mkdir "$tmpdir"
+pdfimages "$2" "$tmpdir/img"
+find "$tmpdir" -type f | sort | parallel -j1 tesseract -l "$lang" {} {.}
+find "$tmpdir" -name "*.txt" | sort | xargs cat > "$tmpdir.txt"
+rm -rf "$tmpdir"
