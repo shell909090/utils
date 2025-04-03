@@ -1,0 +1,11 @@
+#!/bin/bash
+
+lang="$1"
+tmpdir=$(mktemp -d)
+
+mkdir "$tmpdir"
+# pdfimages "$2" "$tmpdir/img"
+convert -density 300 "$2" "$tmpdir/img-%03d.png"
+find "$tmpdir" -type f | sort | parallel -j1 tesseract -l "$lang" {} {.}
+find "$tmpdir" -name "*.txt" | sort | xargs cat > $(basename "$2" .pdf)".txt"
+rm -rf "$tmpdir"

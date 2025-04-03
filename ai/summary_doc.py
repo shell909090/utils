@@ -1,30 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 '''
-@date: 2025-03-15
+@date: 2025-04-01
 @author: Shell.Xu
 @copyright: 2025, Shell.Xu <shell909090@gmail.com>
 @license: BSD-3-clause
 '''
-from gevent import monkey
-monkey.patch_all()
-
-import os
 import re
+import os
 import sys
+import time
 import logging
 import argparse
-from os import path
 
 import requests
-from gevent.pool import Pool
-
-# import http.client as http_client
-# http_client.HTTPConnection.debuglevel = 1
-
-headers = {
-    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
-}
 
 
 def setup_logging(lv):
@@ -35,29 +24,34 @@ def setup_logging(lv):
     logger.setLevel(lv)
 
 
-def get_text_from_url(url, raise_status=False):
-    from bs4 import BeautifulSoup
-    logging.info(f'get content from url: {url}')
-    resp = requests.get(url, headers=headers)
-    if raise_status:
-        resp.raise_for_status()
-    elif resp.status_code >= 400:
-        logging.error(f'error when get content from url: {url} {resp.status_code}')
-        return
-    doc = BeautifulSoup(resp.text, 'html.parser')
-    return doc.get_text('\n', strip=True)
+def source_doc(fp):
+    with open(fp) as fi:
+        for line in fi:
+            yield line.rstrip()
 
 
-def get_text_from_urls(urls, concurrent=5, raise_status=False):
-    pool = Pool(concurrent)
-    docs = pool.imap(lambda u: get_text_from_url(u, raise_status), urls)
-    return [doc for doc in docs if doc]
+def paragraf_doc(txt):
+    s = ''
+    for line in txt:
+        if not line:
+            yield s
+            s = ''
+        else:
+            s += '\n' + line
+    if s:
+        yield s
 
 
-def duckduckgo(q, max_results=5):
-    from duckduckgo_search import DDGS
-    results = DDGS().text(q, max_results=max_results)
-    return [r['href'] for r in results]
+def chapter_doc(txt, max_size=16384):
+    s = ''
+    for p in txt:
+        if len(s) + len(p) > max_size:
+            yield s
+            s = p
+        else:
+            s += p
+    if s:
+        yield s
 
 
 def fmt_ollama_stat(data):
@@ -108,6 +102,7 @@ def openai_chat(messages):
     logging.info(fmt_openai_stat(data['usage']))
     return data['choices'][0]['message']['content']
 
+
 re_think = re.compile('<think>.*</think>', re.DOTALL)
 def ai_chat(messages, remove_think=False):
     if args.ollama_endpoint:
@@ -121,6 +116,36 @@ def ai_chat(messages, remove_think=False):
     return response
 
 
+def summary_chapter(c):
+    messages = [
+        {'role': 'system', 'content': '你是一个AI个人助理，请阅读以下材料，简述主要观点和关键内容。材料以<start>开始，以</end>结束。简述要详细，最好给出引用。无论材料以何种语言书写，你都要用中文总结。'},
+        {'role': 'user', 'content': f'<start>{c}</end>'},
+    ]
+    return ai_chat(messages, True)
+
+
+def summary_doc(doc, fp=None):
+    if fp:
+        fo = open(fp, 'a')
+    else:
+        fo = None
+    for i, c in enumerate(doc):
+        if fo:
+            fo.write(f'-----{i+1}-----\n\n{c}\n\n')
+            fo.flush()
+        logging.info(f'summary chapter {i+1}, size: {len(c)}')
+        yield summary_chapter(c)
+    if fo:
+        fo.close()
+
+
+def doc_to_file(fo, doc):
+    for i, d in enumerate(doc):
+        fo.write(f'-----{i+1}-----\n\n{d}\n\n')
+        fo.flush()
+        time.sleep(args.interval)
+
+
 def main():
     global args
     parser = argparse.ArgumentParser()
@@ -129,14 +154,11 @@ def main():
     parser.add_argument('--ollama-endpoint', '-ae', default=os.getenv('OLLAMA_ENDPOINT'), help='ollama endpoint')
     parser.add_argument('--openai-endpoint', '-ie', default=os.getenv('OPENAI_ENDPOINT'), help='openai endpoint')
     parser.add_argument('--openai-apikey', '-ik', default=os.getenv('OPENAI_APIKEY'), help='openai apikey')
-    parser.add_argument('--model', '-m', default=os.getenv('CHAT_MODEL', 'deepseek-r1:14b'), help='model')
-    parser.add_argument('--from-input', '-fi', action='store_true', help='read background from stdin')
-    parser.add_argument('--max-context-length', '-c', type=int, default=32768, help='maximum context length')
-    parser.add_argument('--remove-think', '-rt', action='store_true', help='remove think')
-    parser.add_argument('--file', '-f', action='append', help='input file')
-    parser.add_argument('--url', '-u', action='append', help='source url')
-    parser.add_argument('--search-duckduckgo', '-ddgs', action='store_true', help='search duckduckgo as source')
-    parser.add_argument('--search-engine-max-results', '-semr', type=int, default=5, help='max results for refer')
+    parser.add_argument('--model', '-m', default=os.getenv('MODEL', 'deepseek-r1:14b'), help='ollama model')
+    parser.add_argument('--max-context-length', '-c', type=int, default=16384, help='maximum context length')
+    parser.add_argument('--interval', '-iv', type=int, default=10, help='let ollama cool down')
+    parser.add_argument('--chapter-output', '-co', help='filename of chapters')
+    parser.add_argument('--summary-output', '-so', default='summary.txt', help='filename of summary')
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
 
@@ -151,46 +173,13 @@ def main():
         'num_batch': 16,
     }
 
-    command = '. '.join(args.rest)
-    if not command:
-        logging.error('no command')
-        return
-    if args.debug:
-        logging.debug(f'command: {command}')
-
-    background = []
-
-    if args.file:
-        for fp in args.file:
-            with open(fp) as fi:
-                logging.info(f'get content from file: {fp}')
-                background.append(fi.read())
-
-    if args.url:
-        background.extend(get_text_from_urls(args.url, len(args.url), raise_status=True))
-
-    if args.from_input:
-        background.append(sys.stdin.read())
-
-    if args.search_duckduckgo:
-        urls = duckduckgo(command, args.search_engine_max_results)
-        for u in urls:
-            logging.info(f'search result url: {u}')
-        background.extend(get_text_from_urls(urls, args.search_engine_max_results))
-
-    if args.debug:
-        for b in background:
-            logging.debug(f'background: {b}')
-
-    messages = [
-        {'role': 'system', 'content': '你是一个AI个人助理，请阅读以下材料，帮助用户回答问题。每篇材料以<start>开始，以</end>结束。回答问题的时候，需要给出每篇材料的原始信息引用和位置。'}
-    ]
-    for doc in background:
-        messages.append({'role': 'user', 'content': f'<start>{doc}</end>'})
-    messages.append({'role': 'user', 'content': command})
-
-    response = ai_chat(messages, args.remove_think)
-    print(response)
+    for fp in args.rest:
+        doc = source_doc(fp)
+        doc = paragraf_doc(doc)
+        doc = chapter_doc(doc, max_size=args.max_context_length)
+        doc = summary_doc(doc, args.chapter_output)
+        with open(args.summary_output, 'a') as fo:
+            doc_to_file(fo, doc)
 
 
 if __name__ == '__main__':
