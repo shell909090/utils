@@ -77,7 +77,10 @@ def ollama_chat(messages):
         'model': args.model,
         'stream': False,
         'messages': messages,
-        'options': options,
+        'options': {
+            'num_ctx': args.max_context_length,
+            'num_batch': 16,
+        },
     })
     resp.raise_for_status()
     logging.info('received response from ollama')
@@ -146,18 +149,10 @@ def main():
     if not args.ollama_endpoint and not args.openai_endpoint:
         args.ollama_endpoint = 'http://127.0.0.1:11434'
 
-    global options
-    options = {
-        'num_ctx': args.max_context_length,
-        'num_batch': 16,
-    }
-
     command = '. '.join(args.rest)
     if not command:
         logging.error('no command')
         return
-    if args.debug:
-        logging.debug(f'command: {command}')
 
     background = []
 
@@ -183,11 +178,11 @@ def main():
         for b in background:
             logging.debug(f'background: {b}')
 
-    messages = [
-        {'role': 'system', 'content': '你是一个AI个人助理，请阅读以下材料，帮助用户回答问题。每篇材料以<start>开始，以</end>结束。回答问题的时候，需要给出每篇材料的原始信息引用和位置。'}
-    ]
-    for doc in background:
-        messages.append({'role': 'user', 'content': f'<start>{doc}</end>'})
+    messages = []
+    if background:
+        messages.append({'role': 'system', 'content': '你是一个AI个人助理，请阅读以下材料，帮助用户回答问题。每篇材料以<start>开始，以</end>结束。回答问题的时候，需要给出每篇材料的原始信息引用和位置。'})
+        for doc in background:
+            messages.append({'role': 'user', 'content': f'<start>{doc}</end>'})
     messages.append({'role': 'user', 'content': command})
 
     response = ai_chat(messages, args.remove_think)

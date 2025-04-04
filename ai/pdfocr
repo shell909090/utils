@@ -1,11 +1,11 @@
 #!/bin/bash
 
-lang="$1"
+lang="chi_sim"
+pdf="$1"
 tmpdir=$(mktemp -d)
+trap 'rm -rf -- "$tmpdir"' EXIT
 
-mkdir "$tmpdir"
-# pdfimages "$2" "$tmpdir/img"
-convert -density 300 "$2" "$tmpdir/img-%03d.png"
+# pdfimages "$pdf" "$tmpdir/img"
+convert -density 300 "$pdf" "$tmpdir/img-%03d.png"
 find "$tmpdir" -type f | sort | parallel -j1 tesseract -l "$lang" {} {.}
-find "$tmpdir" -name "*.txt" | sort | xargs cat > $(basename "$2" .pdf)".txt"
-rm -rf "$tmpdir"
+find "$tmpdir" -name "*.txt" | sort | xargs cat > $(basename "$pdf" .pdf)".txt"

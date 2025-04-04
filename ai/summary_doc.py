@@ -42,11 +42,11 @@ def paragraf_doc(txt):
         yield s
 
 
-def chapter_doc(txt, max_size=16384):
+def chapter_doc(txt, max_size=8192):
     s = ''
     for p in txt:
         if len(s) + len(p) > max_size:
-            yield s
+            yield s + p  # 重复跨章节段落
             s = p
         else:
             s += p
@@ -71,7 +71,10 @@ def ollama_chat(messages):
         'model': args.model,
         'stream': False,
         'messages': messages,
-        'options': options,
+        'options': {
+            'num_ctx': args.max_context_length,
+            'num_batch': 16,
+        },
     })
     resp.raise_for_status()
     logging.info('received response from ollama')
@@ -143,7 +146,8 @@ def doc_to_file(fo, doc):
     for i, d in enumerate(doc):
         fo.write(f'-----{i+1}-----\n\n{d}\n\n')
         fo.flush()
-        time.sleep(args.interval)
+        if args.interval:
+            time.sleep(args.interval)
 
 
 def main():
@@ -155,8 +159,8 @@ def main():
     parser.add_argument('--openai-endpoint', '-ie', default=os.getenv('OPENAI_ENDPOINT'), help='openai endpoint')
     parser.add_argument('--openai-apikey', '-ik', default=os.getenv('OPENAI_APIKEY'), help='openai apikey')
     parser.add_argument('--model', '-m', default=os.getenv('MODEL', 'deepseek-r1:14b'), help='ollama model')
-    parser.add_argument('--max-context-length', '-c', type=int, default=16384, help='maximum context length')
-    parser.add_argument('--interval', '-iv', type=int, default=10, help='let ollama cool down')
+    parser.add_argument('--max-context-length', '-c', type=int, default=8192, help='maximum context length')
+    parser.add_argument('--interval', '-iv', type=int, help='let ollama cool down')
     parser.add_argument('--chapter-output', '-co', help='filename of chapters')
     parser.add_argument('--summary-output', '-so', default='summary.txt', help='filename of summary')
     parser.add_argument('rest', nargs='*', type=str)
@@ -166,12 +170,6 @@ def main():
 
     if not args.ollama_endpoint and not args.openai_endpoint:
         args.ollama_endpoint = 'http://127.0.0.1:11434'
-
-    global options
-    options = {
-        'num_ctx': args.max_context_length,
-        'num_batch': 16,
-    }
 
     for fp in args.rest:
         doc = source_doc(fp)
