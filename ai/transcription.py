@@ -12,8 +12,12 @@ monkey.patch_all()
 import os
 import re
 import sys
+import math
+import time
 import logging
 import argparse
+import tempfile
+import subprocess
 from os import path
 
 import requests
@@ -45,9 +49,9 @@ def openai_transcription(fp):
             'language': (None, args.language),
             # 'timestamp_granularities': (None, '["word"]'),
         }
-        logging.info(f'send request to groq: {args.openai_endpoint} {args.model}')
+        logging.info(f'send request to openai: {args.openai_endpoint} {args.model}')
         resp = requests.post(f'{args.openai_endpoint}/audio/transcriptions', headers=headers, files=files)
-        logging.info('received response from groq')
+        logging.info('received response from openai')
     if resp.status_code >= 400:
         logging.error(resp.content)
     resp.raise_for_status()
@@ -55,14 +59,45 @@ def openai_transcription(fp):
     return '\n'.join((s['text'] for s in data['segments']))
 
 
+re_format = re.compile(r'\[FORMAT\].*duration=(.*)\[/FORMAT\]', re.DOTALL)
+def get_duration(fp):
+    p = subprocess.run(['ffprobe', '-v', '0', '-show_entries', 'format=duration', fp], capture_output=True)
+    stdout = p.stdout.decode('utf-8')
+    logging.debug(f'ffprobe output: {stdout}')
+    m = re_format.search(stdout)
+    if not m:
+        raise Exception(f"can't get duration: {stdout}")
+    return float(m.group(1).strip())
+
+
+def pre_processing_audio(fp, i, td):
+    logging.info(f'split audio chunk {i}')
+    command = ['ffmpeg', '-i', fp, '-ar', '16000', '-ac', '1', '-ss', f'{10*i}:00', '-t', '10:30', f'{td}/{i}.mp3']
+    p = subprocess.run(command)
+    return f'{td}/{i}.mp3'
+
+
 def proc_file(fp):
     basefp = path.splitext(fp)[0]
     if path.exists(f'{basefp}.txt'):
         logging.info(f'{fp} has been processed before.')
         return
-    output = openai_transcription(fp)
-    with open(f'{basefp}.txt', 'w') as fo:
-        fo.write(output)
+    duration = get_duration(fp)
+    chunks = math.ceil(duration/600)
+
+    if chunks == 1:
+        output = openai_transcription(fp)
+        with open(f'{basefp}.txt', 'w') as fo:
+            fo.write(output)
+        return
+
+    with tempfile.TemporaryDirectory() as td:
+        for i in range(chunks):
+            tmpfile = pre_processing_audio(fp, i, td)
+            output = openai_transcription(tmpfile)
+            with open(f'{basefp}.txt', 'a') as fo:
+                fo.write(f'-----{i+1}-----\n\n{output}\n\n')
+            time.sleep(5)
 
 
 def main():
@@ -72,7 +107,7 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='log level')
     parser.add_argument('--openai-endpoint', '-ie', default=os.getenv('OPENAI_ENDPOINT'), help='openai endpoint')
     parser.add_argument('--openai-apikey', '-ik', default=os.getenv('OPENAI_APIKEY'), help='openai apikey')
-    parser.add_argument('--model', '-m', default=os.getenv('MODEL', 'whisper-large-v3'), help='model')
+    parser.add_argument('--model', '-m', default=os.getenv('TRANS_MODEL', 'whisper-large-v3'), help='model')
     parser.add_argument('--language', '-lg', default='zh', help='language')
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
