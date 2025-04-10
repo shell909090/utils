@@ -30,26 +30,16 @@ def source_doc(fp):
             yield line.rstrip()
 
 
-def paragraf_doc(txt):
+def chapter_doc(txt, max_size=8192):
     s = ''
     for line in txt:
         if not line:
-            yield s
-            s = ''
+            continue
+        if len(s) + len(line) > max_size:
+            yield s + '\n' + line  # 重复跨章节内容
+            s = line
         else:
             s += '\n' + line
-    if s:
-        yield s
-
-
-def chapter_doc(txt, max_size=8192):
-    s = ''
-    for p in txt:
-        if len(s) + len(p) > max_size:
-            yield s + p  # 重复跨章节段落
-            s = p
-        else:
-            s += p
     if s:
         yield s
 
@@ -173,7 +163,6 @@ def main():
 
     for fp in args.rest:
         doc = source_doc(fp)
-        doc = paragraf_doc(doc)
         doc = chapter_doc(doc, max_size=args.max_context_length)
         doc = summary_doc(doc, args.chapter_output)
         with open(args.summary_output, 'a') as fo:
