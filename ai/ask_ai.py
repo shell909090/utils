@@ -19,6 +19,8 @@ from os import path
 import requests
 from gevent.pool import Pool
 
+import ai
+
 # import http.client as http_client
 # http_client.HTTPConnection.debuglevel = 1
 
@@ -60,71 +62,6 @@ def duckduckgo(q, max_results=5):
     return [r['href'] for r in results]
 
 
-def fmt_ollama_stat(data):
-    # 将所有浮点数输出改为小数点后两位格式
-    duration_total = data['total_duration'] / 10**9
-    prompt_eval_count = data['prompt_eval_count']
-    prompt_eval_duration = data['prompt_eval_duration'] / 10**9
-    eval_count = data['eval_count']
-    eval_duration = data['eval_duration'] / 10**9
-    eval_rate = eval_count / eval_duration
-    return f'total_duration: {duration_total:.2f}, prompt_eval_count: {prompt_eval_count}, prompt_eval_duration: {prompt_eval_duration:.2f}, eval_count: {eval_count}, eval_duration: {eval_duration:.2f}, eval_rate: {eval_rate:.2f}'
-
-
-def ollama_chat(messages):
-    logging.info(f'send request to ollama: {args.ollama_endpoint} {args.model}')
-    resp = requests.post(f'{args.ollama_endpoint}/api/chat', json={
-        'model': args.model,
-        'stream': False,
-        'messages': messages,
-        'options': {
-            'num_ctx': args.max_context_length,
-            'num_batch': 16,
-        },
-    })
-    resp.raise_for_status()
-    logging.info('received response from ollama')
-    data = resp.json()
-    logging.info(fmt_ollama_stat(data))
-    return data['message']['content']
-
-
-def fmt_openai_stat(usage):
-    return f"total_tokens: {usage['total_tokens']}, prompt_tokens: {usage['prompt_tokens']}, completion_tokens: {usage['completion_tokens']}"
-
-
-def openai_chat(messages):
-    headers = {
-        'Content-Type': 'application/json',
-    }
-    if args.openai_apikey:
-        headers['Authorization'] = f'Bearer {args.openai_apikey}'
-    logging.info(f'send request to openai: {args.openai_endpoint} {args.model}')
-    resp = requests.post(f'{args.openai_endpoint}/chat/completions', headers=headers, json={
-        'model': args.model,
-        'stream': False,
-        'messages': messages,
-    })
-    resp.raise_for_status()
-    logging.info('received response from openai')
-    data = resp.json()
-    logging.info(fmt_openai_stat(data['usage']))
-    return data['choices'][0]['message']['content']
-
-
-re_think = re.compile('<think>.*</think>', re.DOTALL)
-def ai_chat(messages, remove_think=False):
-    if args.ollama_endpoint:
-        response = ollama_chat(messages)
-    else:
-        response = openai_chat(messages)
-    if args.debug:
-        logging.debug(f'response: {response}')
-    if remove_think:
-        response = re_think.sub('', response)
-    return response
-
-
 def main():
     global args
     parser = argparse.ArgumentParser()
@@ -133,10 +70,10 @@ def main():
     parser.add_argument('--ollama-endpoint', '-ae', default=os.getenv('OLLAMA_ENDPOINT'), help='ollama endpoint')
     parser.add_argument('--openai-endpoint', '-ie', default=os.getenv('OPENAI_ENDPOINT'), help='openai endpoint')
     parser.add_argument('--openai-apikey', '-ik', default=os.getenv('OPENAI_APIKEY'), help='openai apikey')
-    parser.add_argument('--model', '-m', default=os.getenv('MODEL', 'deepseek-r1:14b'), help='model')
-    parser.add_argument('--from-input', '-fi', action='store_true', help='read background from stdin')
+    parser.add_argument('--model', '-m', default=os.getenv('MODEL'), help='model')
     parser.add_argument('--max-context-length', '-c', type=int, default=16384, help='maximum context length')
     parser.add_argument('--remove-think', '-rt', action='store_true', help='remove think')
+    parser.add_argument('--from-input', '-fi', action='store_true', help='read background from stdin')
     parser.add_argument('--file', '-f', action='append', help='input file')
     parser.add_argument('--url', '-u', action='append', help='source url')
     parser.add_argument('--search-duckduckgo', '-ddgs', action='store_true', help='search duckduckgo as source')
@@ -148,6 +85,8 @@ def main():
 
     if not args.ollama_endpoint and not args.openai_endpoint:
         args.ollama_endpoint = 'http://127.0.0.1:11434'
+
+    provider = ai.make_provider_from_args(args)
 
     command = '. '.join(args.rest)
     if not command:
@@ -180,12 +119,12 @@ def main():
 
     messages = []
     if background:
-        messages.append({'role': 'system', 'content': '你是一个AI个人助理，请阅读以下材料，帮助用户回答问题。每篇材料以<start>开始，以</end>结束。回答问题的时候，需要给出每篇材料的原始信息引用和位置。'})
+        messages.append({'role': 'user', 'content': '你是一个AI个人助理，请阅读以下材料，帮助用户回答问题。每篇材料以<start>开始，以</end>结束。回答问题的时候，需要给出每篇材料的原始信息引用和位置。'})
         for doc in background:
             messages.append({'role': 'user', 'content': f'<start>{doc}</end>'})
     messages.append({'role': 'user', 'content': command})
 
-    response = ai_chat(messages, args.remove_think)
+    response = provider.chat(args.model, messages, remove_think=args.remove_think)
     print(response)
 
 

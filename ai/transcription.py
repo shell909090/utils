@@ -35,30 +35,6 @@ def setup_logging(lv):
     logger.setLevel(lv)
 
 
-def openai_transcription(fp):
-    headers = {}
-    if args.openai_apikey:
-        headers['Authorization'] = f'Bearer {args.openai_apikey}'
-    logging.info(f'read file: {fp}')
-    with open(fp, 'rb') as fi:
-        files = {
-            'file': (path.basename(fp), fi, 'application/octet-stream'),
-            'model': (None, args.model),
-            'temperature': (None, '0'),
-            'response_format': (None, 'verbose_json'),
-            'language': (None, args.language),
-            # 'timestamp_granularities': (None, '["word"]'),
-        }
-        logging.info(f'send request to openai: {args.openai_endpoint} {args.model}')
-        resp = requests.post(f'{args.openai_endpoint}/audio/transcriptions', headers=headers, files=files)
-        logging.info('received response from openai')
-    if resp.status_code >= 400:
-        logging.error(resp.content)
-    resp.raise_for_status()
-    data = resp.json()
-    return '\n'.join((s['text'] for s in data['segments']))
-
-
 re_format = re.compile(r'\[FORMAT\].*duration=(.*)\[/FORMAT\]', re.DOTALL)
 def get_duration(fp):
     p = subprocess.run(['ffprobe', '-v', '0', '-show_entries', 'format=duration', fp], capture_output=True)
@@ -72,12 +48,12 @@ def get_duration(fp):
 
 def pre_processing_audio(fp, i, td):
     logging.info(f'split audio chunk {i}')
-    command = ['ffmpeg', '-i', fp, '-ar', '16000', '-ac', '1', '-ss', f'{10*i}:00', '-t', '10:30', f'{td}/{i}.mp3']
+    command = ['ffmpeg', '-i', fp, '-ar', '16000', '-ac', '1', '-ss', f'{10*i}:00', '-t', '10:10', f'{td}/{i}.mp3']
     p = subprocess.run(command)
     return f'{td}/{i}.mp3'
 
 
-def proc_file(fp):
+def proc_file(provider, fp):
     basefp = path.splitext(fp)[0]
     if path.exists(f'{basefp}.txt'):
         logging.info(f'{fp} has been processed before.')
@@ -86,7 +62,7 @@ def proc_file(fp):
     chunks = math.ceil(duration/600)
 
     if chunks == 1:
-        output = openai_transcription(fp)
+        output = provider.transcription(fp)
         with open(f'{basefp}.txt', 'w') as fo:
             fo.write(output)
         return
@@ -94,7 +70,7 @@ def proc_file(fp):
     with tempfile.TemporaryDirectory() as td:
         for i in range(chunks):
             tmpfile = pre_processing_audio(fp, i, td)
-            output = openai_transcription(tmpfile)
+            output = provider.transcription(tmpfile)
             with open(f'{basefp}.txt', 'a') as fo:
                 fo.write(f'-----{i+1}-----\n\n{output}\n\n')
             time.sleep(5)
@@ -114,8 +90,11 @@ def main():
 
     setup_logging(args.log_level.upper())
 
+    provider = ai.make_provider_from_args(args)
+
     for fp in args.rest:
-        proc_file(fp)
+        proc_file(provider, fp)
+
 
 if __name__ == '__main__':
     main()
