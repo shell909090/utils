@@ -24,10 +24,6 @@ import ai
 # import http.client as http_client
 # http_client.HTTPConnection.debuglevel = 1
 
-headers = {
-    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
-}
-
 
 def setup_logging(lv):
     logger = logging.getLogger()

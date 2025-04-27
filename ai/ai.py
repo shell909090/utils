@@ -154,3 +154,11 @@ def make_provider_from_args(args):
         return Ollama(args.ollama_endpoint, max_context_length=args.max_context_length)
     elif args.openai_endpoint:
         return OpenAI(args.openai_endpoint, apikey=args.openai_apikey)
+    elif os.getenv('GEMINI_APIKEY'):
+        return OpenAI('https://generativelanguage.googleapis.com/v1beta/openai', apikey=os.getenv('GEMINI_APIKEY'))
+    elif os.getenv('GROQ_APIKEY'):
+        return OpenAI('https://api.groq.com/openai/v1', apikey=os.getenv('GROQ_APIKEY'))
+    elif os.getenv('OPENROUTER_APIKEY'):
+        return OpenAI('https://openrouter.ai/api/v1', apikey=os.getenv('OPENROUTER_APIKEY'))
+    else:
+        raise Exception('provider not found in args')
