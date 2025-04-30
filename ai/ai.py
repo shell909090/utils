@@ -8,6 +8,7 @@
 '''
 import re
 import logging
+from os import path
 
 import requests
 
@@ -150,7 +151,7 @@ class OpenAI(Provider):
 
 
 def make_provider_from_args(args):
-    if args.ollama_endpoint:
+    if hasattr(args, 'ollama_endpoint') and args.ollama_endpoint:
         return Ollama(args.ollama_endpoint, max_context_length=args.max_context_length)
     elif args.openai_endpoint:
         return OpenAI(args.openai_endpoint, apikey=args.openai_apikey)

@@ -23,6 +23,8 @@ from os import path
 import requests
 from gevent.pool import Pool
 
+import ai
+
 # import http.client as http_client
 # http_client.HTTPConnection.debuglevel = 1
 
@@ -62,7 +64,7 @@ def proc_file(provider, fp):
     chunks = math.ceil(duration/600)
 
     if chunks == 1:
-        output = provider.transcription(fp)
+        output = provider.transcription(args.model, fp, language=args.language)
         with open(f'{basefp}.txt', 'w') as fo:
             fo.write(output)
         return
@@ -70,7 +72,7 @@ def proc_file(provider, fp):
     with tempfile.TemporaryDirectory() as td:
         for i in range(chunks):
             tmpfile = pre_processing_audio(fp, i, td)
-            output = provider.transcription(tmpfile)
+            output = provider.transcription(args.model, tmpfile, language=args.language)
             with open(f'{basefp}.txt', 'a') as fo:
                 fo.write(f'-----{i+1}-----\n\n{output}\n\n')
             time.sleep(5)
