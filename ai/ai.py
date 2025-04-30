@@ -6,6 +6,7 @@
 @copyright: 2025, Shell.Xu <shell909090@gmail.com>
 @license: BSD-3-clause
 '''
+import os
 import re
 import logging
 from os import path
