@@ -30,7 +30,7 @@ class Provider(object):
         if resp.status_code >= 400:
             logging.error(resp.content)
         resp.raise_for_status()
-        logging.info('received response from {self.name}')
+        logging.info(f'received response from {self.name}')
         return resp.json()
 
     def chat(self, model, messages, remove_think=False, **kwargs):
