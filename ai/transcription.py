@@ -50,7 +50,7 @@ def get_duration(fp):
 
 def pre_processing_audio(fp, i, td):
     logging.info(f'split audio chunk {i}')
-    command = ['ffmpeg', '-i', fp, '-ar', '16000', '-ac', '1', '-ss', f'{10*i}:00', '-t', '10:10', f'{td}/{i}.mp3']
+    command = ['ffmpeg', '-i', fp, '-ar', '16000', '-ac', '1', '-ss', f'{i//6}:{10*(i%6)}:00', '-t', '10:10', f'{td}/{i}.mp3']
     p = subprocess.run(command)
     return f'{td}/{i}.mp3'
 

@@ -36,13 +36,13 @@ class Provider(object):
     def chat(self, model, messages, remove_think=False, **kwargs):
         response = self._chat(model, messages, **kwargs)
         if remove_think:
-            response = re_think.sub('', response)
+            response = self.re_think.sub('', response)
         return response
 
     def generate(self, model, input, remove_think=False, **kwargs):
         response = self._generate(model, input, **kwargs)
         if remove_think:
-            response = re_think.sub('', response)
+            response = self.re_think.sub('', response)
         return response
 
 
