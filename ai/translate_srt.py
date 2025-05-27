@@ -81,7 +81,7 @@ def park_segments(segments, max_context_length=8192):
 
 
 def translate_segments(segments):
-    translated = []
+    translated = {}
     for p in park_segments(segments):
         logging.debug(f'original:{p}')
 
@@ -98,20 +98,23 @@ def translate_segments(segments):
                 continue
             try:
                 cnt, text = line.split('|', 1)
-                translated.append((int(cnt), text))
+                translated[int(cnt)] = text
             except ValueError:
                 pass
 
     if len(translated) != len(segments):
         logging.warning(f'{len(translated)} translated, not match the number of original')
 
-    for s, t in zip(segments, translated):
-        if int(t[0]) != s['count']:
-            logging.warning(f'count not match: {int(t[0])} / {s["count"]}')
+    for s in segments:
+        if s['count'] not in translated:
+            logging.warning(f'count {s["count"]} not been translated')
+            yield s
+            continue
+        t = translated[s['count']]
         if args.comparative:
-            s['text'] += '\n' + t[1]
+            s['text'] += '\n' + t
         else:
-            s['text'] = t[1]
+            s['text'] = t
         yield s
 
 
@@ -125,6 +128,7 @@ def proc_srt(fp):
     logging.info(f'{len(segments)} segments readed')
     translated = translate_segments(segments)
     write_srt(fp+'.tr', translated)
+    logging.info(f'{len(segments)} segments wrote')
 
 
 def main():
