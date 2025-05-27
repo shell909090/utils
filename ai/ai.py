@@ -148,7 +148,7 @@ class OpenAI(Provider):
             logging.error(resp.content)
         resp.raise_for_status()
         data = resp.json()
-        return '\n'.join((s['text'] for s in data['segments']))
+        return data['segments']
 
 
 def make_provider_from_args(args):

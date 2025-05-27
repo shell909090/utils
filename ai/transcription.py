@@ -16,6 +16,7 @@ import math
 import time
 import logging
 import argparse
+import datetime
 import tempfile
 import subprocess
 from os import path
@@ -37,6 +38,37 @@ def setup_logging(lv):
     logger.setLevel(lv)
 
 
+class Writer(object):
+
+    def __init__(self, fp):
+        self.f = open(fp, 'a')
+        self.i = 0
+
+    def close(self):
+        self.f.close()
+
+
+class TxtWriter(Writer):
+
+    def write(self, segment):
+        self.f.write(segment['text']+'\n')
+        self.f.flush()
+
+
+class SrtWriter(Writer):
+
+    @staticmethod
+    def fmt_time(t):
+        s = int(t) % 60
+        m = int(int(t) / 60)
+        return f'{int(m / 60):02}:{m % 60:02}:{s:02},{int(t*1000) % 1000:03}'
+
+    def write(self, segment):
+        self.i += 1
+        self.f.write(f'{self.i}\n{self.fmt_time(segment["start"])} --> {self.fmt_time(segment["end"])}\n{segment["text"].strip()}\n\n')
+        self.f.flush()
+
+
 re_format = re.compile(r'\[FORMAT\].*duration=(.*)\[/FORMAT\]', re.DOTALL)
 def get_duration(fp):
     p = subprocess.run(['ffprobe', '-v', '0', '-show_entries', 'format=duration', fp], capture_output=True)
@@ -48,34 +80,95 @@ def get_duration(fp):
     return float(m.group(1).strip())
 
 
-def pre_processing_audio(fp, i, td):
-    logging.info(f'split audio chunk {i}')
-    command = ['ffmpeg', '-i', fp, '-ar', '16000', '-ac', '1', '-ss', f'{i//6}:{10*(i%6)}:00', '-t', '10:10', f'{td}/{i}.mp3']
-    p = subprocess.run(command)
+re_silence_start = re.compile('.*silence_start: (.*)')
+def detect_slience(fp, db=30, duration=0.5):
+    logging.info('detect slience')
+    command = ['ffmpeg', '-i', fp, '-af', f'silencedetect=n=-{db}dB:d={duration}', '-f', 'null', '-']
+    p = subprocess.run(command, capture_output=True)
+    stderr = p.stderr.decode('utf-8')
+    for line in stderr.splitlines():
+        line = line.strip()
+        if not line.startswith('[silencedetect'):
+            continue
+        m = re_silence_start.match(line)
+        if m:
+            yield float(m.group(1))
+
+
+def pick_gaps(gaps, max_chunk_duration=600):
+    s = max_chunk_duration
+    while len(gaps) > 1:
+        if gaps[0] > s:
+            raise Exception(f'gap oversize: {gaps[0]} / {s}')
+        if gaps[1] >= s:
+            s = gaps[0] + max_chunk_duration
+            yield gaps[0]
+        gaps.pop(0)
+    if gaps[0] > s:
+        raise Exception(f'gap oversize: {gaps[0]} / {s}')
+    yield gaps[0]
+
+
+def cut_off_audio(fp):
+    duration = get_duration(fp)
+    gaps = list(detect_slience(fp))
+    gaps.append(duration)
+    logging.debug(f'gaps1: {gaps}')
+    gaps = list(pick_gaps(gaps))
+    gaps.insert(0, 0)
+    logging.info(f'gaps2: {gaps}')
+    return gaps
+
+
+def pre_processing_audio(fp, i, start, end, td):
+    logging.info(f'split audio chunk {i}, start: {start}, end: {end}, duration: {end-start}')
+    command = ['ffmpeg', '-i', fp, '-ar', '16000', '-ac', '1',
+               '-ss', str(datetime.timedelta(seconds=start)),
+               '-to', str(datetime.timedelta(seconds=end)),
+               f'{td}/{i}.mp3']
+    p = subprocess.run(command, stderr=subprocess.DEVNULL)
     return f'{td}/{i}.mp3'
+
+
+def transcription(provider, fp):
+    gaps = cut_off_audio(fp)
+    with tempfile.TemporaryDirectory() as td:
+        i = 0
+        while len(gaps) > 1:
+            tmpfile = pre_processing_audio(fp, i, gaps[0], gaps[1], td)
+            segments = provider.transcription(args.model, tmpfile, language=args.language)
+            for s in segments:
+                s['start'] += gaps[0]
+                s['end'] += gaps[0]
+                yield s
+            logging.info('waiting 10 seconds')
+            time.sleep(10)
+            i += 1
+            gaps.pop(0)
 
 
 def proc_file(provider, fp):
     basefp = path.splitext(fp)[0]
-    if path.exists(f'{basefp}.txt'):
+    if path.exists(f'{basefp}.txt') or path.exists(f'{basefp}.srt'):
         logging.info(f'{fp} has been processed before.')
         return
-    duration = get_duration(fp)
-    chunks = math.ceil(duration/600)
+    logging.info(f'process {fp}')
 
-    if chunks == 1:
-        output = provider.transcription(args.model, fp, language=args.language)
-        with open(f'{basefp}.txt', 'w') as fo:
-            fo.write(output)
-        return
+    writers = []
+    if not args.disable_txt:
+        logging.info(f'write txt to {basefp}.txt')
+        writers.append(TxtWriter(f'{basefp}.txt'))
+    if not args.disable_srt:
+        logging.info(f'write srt to {basefp}.srt')
+        writers.append(SrtWriter(f'{basefp}.srt'))
 
-    with tempfile.TemporaryDirectory() as td:
-        for i in range(chunks):
-            tmpfile = pre_processing_audio(fp, i, td)
-            output = provider.transcription(args.model, tmpfile, language=args.language)
-            with open(f'{basefp}.txt', 'a') as fo:
-                fo.write(f'-----{i+1}-----\n\n{output}\n\n')
-            time.sleep(5)
+    try:
+        for s in transcription(provider, fp):
+            for w in writers:
+                w.write(s)
+    finally:
+        for w in writers:
+            w.close()
 
 
 def main():
@@ -87,6 +180,8 @@ def main():
     parser.add_argument('--openai-apikey', '-ik', default=os.getenv('OPENAI_APIKEY'), help='openai apikey')
     parser.add_argument('--model', '-m', default=os.getenv('TRANS_MODEL', 'whisper-large-v3'), help='model')
     parser.add_argument('--language', '-lg', default='zh', help='language')
+    parser.add_argument('--disable-txt', '-dt', action='store_true')
+    parser.add_argument('--disable-srt', '-ds', action='store_true')
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
 
