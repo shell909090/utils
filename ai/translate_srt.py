@@ -104,7 +104,7 @@ def translate_park(p):
 
 def translate_segments(segments):
     while segments:
-        p, translate_segments = park_segments(segments)
+        p, translate_segments = park_segments(segments, max_context_length=args.max_context_length)
         logging.info(f'translate {len(translate_segments)} segments')
 
         translated = dict(translate_park(p))
@@ -122,8 +122,8 @@ def translate_segments(segments):
                 s['text'] = translated[s['index']]
             yield s
 
-        logging.info('waiting 10 seconds')
-        time.sleep(10)
+        logging.info(f'waiting {args.interval} seconds')
+        time.sleep(args.interval)
 
 
 def proc_srt(fp):
@@ -152,6 +152,8 @@ def main():
     parser.add_argument('--comparative', '-c', action='store_true', help='output both original text and translated')
     parser.add_argument('--language', '-lg', default='中文')
     parser.add_argument('--prompt', '-p', default='你是一个AI个人助理，请阅读以下材料，将内容翻译为{language}。材料以<start>开始，以</end>结束。注意保持格式不变。注意保持语气。输出内容仅包括翻译结果。')
+    parser.add_argument('--interval', '-i', type=int, default=10, help='wait between each API call')
+    parser.add_argument('--max-context-length', '-mcl', type=int, default=8192, help='max content length in API call')
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
 
