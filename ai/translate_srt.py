@@ -9,6 +9,7 @@
 import os
 import re
 import sys
+import time
 import logging
 import argparse
 from os import path
@@ -26,7 +27,7 @@ def setup_logging(lv):
 
 re_time = re.compile('(\d+):(\d+):(\d+),(\d+) --> (\d+):(\d+):(\d+),(\d+)')
 def read_srt(fp):
-    cnt = None
+    idx = None
     start = None
     end = None
     text = ''
@@ -36,15 +37,15 @@ def read_srt(fp):
             line = line.strip()
 
             if not line:
-                yield {'count': cnt, 'start': start, 'end': end, 'text': text.rstrip()}
-                cnt = None
+                yield {'index': idx, 'start': start, 'end': end, 'text': text.rstrip()}
+                idx = None
                 start = None
                 end = None
                 text = ''
                 continue
 
-            if not cnt:
-                cnt = int(line)
+            if not idx:
+                idx = int(line)
                 continue
 
             m = re_time.match(line)
@@ -64,58 +65,65 @@ def fmt_time(t):
 def write_srt(fp, segments):
     with open(fp, 'w') as fo:
         for s in segments:
-            fo.write(f"{s['count']}\n{fmt_time(s['start'])} --> {fmt_time(s['end'])}\n{s['text']}\n\n")
+            fo.write(f"{s['index']}\n{fmt_time(s['start'])} --> {fmt_time(s['end'])}\n{s['text']}\n\n")
 
 
 def park_segments(segments, max_context_length=8192):
     p = ''
-    for s in segments:
-        text = s["text"].replace('\n', ' ')
-        t = f'{s["count"]}|{text}'
+    translate_segments = []
+    while segments:
+        s = segments[0]
+        text = s['text'].replace('\n', ' ')
+        t = f"{s['index']}|{text}"
         if len(p) + len(t) > max_context_length:
-            yield p.strip()
-            p = t + '\n'
-        else:
-            p += t + '\n'
-    yield p.strip()
+            return p.strip(), translate_segments
+        p += t + '\n'
+        translate_segments.append(segments.pop(0))
+    return p.strip(), translate_segments
+
+
+def translate_park(p):
+    logging.debug(f'original:{p}')
+    messages = [
+        {'role': 'system', 'content': args.prompt},
+        {'role': 'user', 'content': f'<start>{p}</end>'},
+    ]
+    q = provider.chat(args.model, messages, remove_think=True)
+    logging.debug(f'translated:{q}')
+
+    for line in q.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            idx, text = line.split('|', 1)
+            yield int(idx), text
+        except ValueError:
+            pass
 
 
 def translate_segments(segments):
-    translated = {}
-    for p in park_segments(segments):
-        logging.debug(f'original:{p}')
+    while segments:
+        p, translate_segments = park_segments(segments)
+        logging.info(f'translate {len(translate_segments)} segments')
 
-        messages = [
-            {'role': 'system', 'content': args.prompt},
-            {'role': 'user', 'content': f'<start>{p}</end>'},
-        ]
-        q = provider.chat(args.model, messages, remove_think=True)
-        logging.debug(f'translated:{q}')
+        translated = dict(translate_park(p))
+        logging.info(f'{len(translated)} segments translated')
 
-        for line in q.splitlines():
-            line = line.strip()
-            if not line:
+        for s in translate_segments:
+            if s['index'] not in translated:
+                logging.warning(f'index {s["index"]} not been translated')
+                segments.append(s)
                 continue
-            try:
-                cnt, text = line.split('|', 1)
-                translated[int(cnt)] = text
-            except ValueError:
-                pass
 
-    if len(translated) != len(segments):
-        logging.warning(f'{len(translated)} translated, not match the number of original')
-
-    for s in segments:
-        if s['count'] not in translated:
-            logging.warning(f'count {s["count"]} not been translated')
+            if args.comparative:
+                s['text'] += '\n' + translated[s['index']]
+            else:
+                s['text'] = translated[s['index']]
             yield s
-            continue
-        t = translated[s['count']]
-        if args.comparative:
-            s['text'] += '\n' + t
-        else:
-            s['text'] = t
-        yield s
+
+        logging.info('waiting 10 seconds')
+        time.sleep(10)
 
 
 def proc_srt(fp):
@@ -127,8 +135,9 @@ def proc_srt(fp):
     segments = list(read_srt(fp))
     logging.info(f'{len(segments)} segments readed')
     translated = translate_segments(segments)
+    translated = sorted(translated, key=lambda s: s['index'])
     write_srt(fp+'.tr', translated)
-    logging.info(f'{len(segments)} segments wrote')
+    logging.info(f'{len(translated)} segments wrote')
 
 
 def main():
