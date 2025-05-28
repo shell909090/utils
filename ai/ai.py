@@ -137,19 +137,16 @@ class OpenAI(Provider):
         logging.info(self.fmt_openai_stat(data['usage']))
         return data['output'][0]['content']['text']
 
-    def transcription(self, model, fp, language='zh'):
-        logging.info(f'read file: {fp}')
-        with open(fp, 'rb') as fi:
-            files = {
-                'file': (path.basename(fp), fi, 'application/octet-stream'),
-                'model': (None, model),
-                'temperature': (None, '0'),
-                'response_format': (None, 'verbose_json'),
-                'language': (None, language),
-                # 'timestamp_granularities': (None, '["word"]'),
-            }
-            data = self._send_req(f'{self.endpoint}/audio/transcriptions', model, files=files)
-        return data['segments']
+    def transcription(self, model, fn, f, language='zh'):
+        files = {
+            'file': (fn, f, 'application/octet-stream'),
+            'model': (None, model),
+            'temperature': (None, '0'),
+            'response_format': (None, 'verbose_json'),
+            'language': (None, language),
+            # 'timestamp_granularities': (None, '["word"]'),
+        }
+        return self._send_req(f'{self.endpoint}/audio/transcriptions', model, files=files)['segments']
 
 
 def make_provider_from_args(args):

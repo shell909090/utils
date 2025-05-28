@@ -138,7 +138,10 @@ def transcription(provider, fp):
         i = 0
         while len(gaps) > 1:
             tmpfile = pre_processing_audio(fp, i, gaps[0], gaps[1], td)
-            segments = provider.transcription(random.choice(args.models), tmpfile, language=args.language)
+            logging.info(f'read file: {tmpfile}')
+            with open(tmpfile, 'rb') as fi:
+                segments = provider.transcription(
+                    random.choice(args.models), path.basename(tmpfile), fi, language=args.language)
             for s in segments:
                 s['start'] += gaps[0]
                 s['end'] += gaps[0]
