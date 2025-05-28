@@ -14,6 +14,7 @@ import re
 import sys
 import math
 import time
+import random
 import logging
 import argparse
 import datetime
@@ -116,7 +117,8 @@ def cut_off_audio(fp):
     logging.debug(f'gaps1: {gaps}')
     gaps = list(pick_gaps(gaps))
     gaps.insert(0, 0)
-    logging.info(f'gaps2: {gaps}')
+    logging.info(f'audio will be splited to {len(gaps)-1} chunks')
+    logging.debug(f'gaps2: {gaps}')
     return gaps
 
 
@@ -136,20 +138,20 @@ def transcription(provider, fp):
         i = 0
         while len(gaps) > 1:
             tmpfile = pre_processing_audio(fp, i, gaps[0], gaps[1], td)
-            segments = provider.transcription(args.model, tmpfile, language=args.language)
+            segments = provider.transcription(random.choice(args.models), tmpfile, language=args.language)
             for s in segments:
                 s['start'] += gaps[0]
                 s['end'] += gaps[0]
                 yield s
-            logging.info('waiting 10 seconds')
-            time.sleep(10)
+            logging.info(f'waiting {args.interval} seconds')
+            time.sleep(args.interval)
             i += 1
             gaps.pop(0)
 
 
 def proc_file(provider, fp):
     basefp = path.splitext(fp)[0]
-    if path.exists(f'{basefp}.txt') or path.exists(f'{basefp}.srt'):
+    if not args.force_overwrite and path.exists(f'{basefp}.txt') or path.exists(f'{basefp}.srt'):
         logging.info(f'{fp} has been processed before.')
         return
     logging.info(f'process {fp}')
@@ -178,14 +180,17 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='log level')
     parser.add_argument('--openai-endpoint', '-ie', default=os.getenv('OPENAI_ENDPOINT'), help='openai endpoint')
     parser.add_argument('--openai-apikey', '-ik', default=os.getenv('OPENAI_APIKEY'), help='openai apikey')
-    parser.add_argument('--model', '-m', default=os.getenv('TRANS_MODEL', 'whisper-large-v3'), help='model')
+    parser.add_argument('--models', '-m', default=os.getenv('TRANS_MODELS', 'whisper-large-v3'), help='models')
     parser.add_argument('--language', '-lg', default='zh', help='language')
+    parser.add_argument('--interval', '-i', type=int, default=10, help='wait between each API call')
+    parser.add_argument('--force-overwrite', '-y', action='store_true')
     parser.add_argument('--disable-txt', '-dt', action='store_true')
     parser.add_argument('--disable-srt', '-ds', action='store_true')
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
 
     setup_logging(args.log_level.upper())
+    args.models = args.models.split(',')
 
     provider = ai.make_provider_from_args(args)
 

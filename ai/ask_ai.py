@@ -14,7 +14,6 @@ import re
 import sys
 import logging
 import argparse
-from os import path
 
 import requests
 from gevent.pool import Pool

@@ -128,7 +128,7 @@ def translate_segments(segments):
 
 def proc_srt(fp):
     logging.info(f'translate {fp}')
-    if path.exists(fp+'.tr'):
+    if not args.force_overwrite and path.exists(fp+'.tr'):
         logging.error('file has been processed')
         return
 
@@ -153,6 +153,7 @@ def main():
     parser.add_argument('--language', '-lg', default='中文')
     parser.add_argument('--prompt', '-p', default='你是一个AI个人助理，请阅读以下材料，将内容翻译为{language}。材料以<start>开始，以</end>结束。注意保持格式不变。注意保持语气。输出内容仅包括翻译结果。')
     parser.add_argument('--interval', '-i', type=int, default=10, help='wait between each API call')
+    parser.add_argument('--force-overwrite', '-y', action='store_true')
     parser.add_argument('--max-context-length', '-mcl', type=int, default=8192, help='max content length in API call')
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
