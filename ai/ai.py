@@ -12,21 +12,28 @@ import logging
 from os import path
 
 import requests
+from requests.adapters import HTTPAdapter, Retry
 
 
 class Provider(object):
     re_think = re.compile('<think>.*</think>', re.DOTALL)
     re_code = re.compile('```.*')
 
-    def _send_json_req(self, url, model, req, headers=None):
-        if not headers:
-            headers = {
-                'Content-Type': 'application/json',
-            }
+    def __init__(self, retries):
+        self.sess = requests.Session()
+        self.retries = Retry(total=retries, backoff_factor=0.1, status_forcelist=[500, 502, 503, 504])
+        self.sess.mount('http://', HTTPAdapter(max_retries=self.retries))
+        self.sess.mount('https://', HTTPAdapter(max_retries=self.retries))
+
+    def _send_req(self, url, model, **kwargs):
+        if 'headers' not in kwargs:
+            kwargs['headers'] = {}
+        if 'json' in kwargs:
+            kwargs['headers']['Content-Type'] = 'application/json'
         if self.apikey:
-            headers['Authorization'] = f'Bearer {self.apikey}'
+            kwargs['headers']['Authorization'] = f'Bearer {self.apikey}'
         logging.info(f'send request to {self.name}: {self.endpoint} {model}')
-        resp = requests.post(url, headers=headers, json=req)
+        resp = self.sess.post(url, **kwargs)
         if resp.status_code >= 400:
             logging.error(resp.content)
         resp.raise_for_status()
@@ -50,10 +57,12 @@ class Ollama(Provider):
 
     name = 'ollama'
 
-    def __init__(self, endpoint, apikey=None, max_context_length=8192):
+    def __init__(self, endpoint, apikey=None, max_context_length=8192, num_batch=16, retries=3):
+        super().__init__(retries)
         self.endpoint = endpoint
         self.apikey = apikey
         self.max_context_length = max_context_length
+        self.num_batch = num_batch
 
     @staticmethod
     def fmt_ollama_stat(data):
@@ -73,10 +82,10 @@ class Ollama(Provider):
             'messages': messages,
             'options': {
                 'num_ctx': self.max_context_length,
-                'num_batch': 16,
+                'num_batch': self.num_batch,
             },
         }
-        data = self._send_json_req(f'{self.endpoint}/api/chat', model, req)
+        data = self._send_req(f'{self.endpoint}/api/chat', model, json=req)
         logging.info(self.fmt_ollama_stat(data))
         return data['message']['content']
 
@@ -87,10 +96,10 @@ class Ollama(Provider):
             'prompt': input,
             'options': {
                 'num_ctx': self.max_context_length,
-                'num_batch': 16,
+                'num_batch': self.num_batch,
             },
         }
-        data = self._send_json_req(f'{self.endpoint}/api/generate', model, req)
+        data = self._send_req(f'{self.endpoint}/api/generate', model, json=req)
         logging.info(self.fmt_ollama_stat(data))
         return data['response']
 
@@ -99,7 +108,8 @@ class OpenAI(Provider):
 
     name = 'openai'
 
-    def __init__(self, endpoint, apikey=None):
+    def __init__(self, endpoint, apikey=None, retries=3):
+        super().__init__(retries)
         self.endpoint = endpoint
         self.apikey = apikey
 
@@ -113,7 +123,7 @@ class OpenAI(Provider):
             'stream': False,
             'messages': messages,
         }
-        data = self._send_json_req(f'{self.endpoint}/chat/completions', model, req)
+        data = self._send_req(f'{self.endpoint}/chat/completions', model, json=req)
         logging.info(self.fmt_openai_stat(data['usage']))
         return data['choices'][0]['message']['content']
 
@@ -123,14 +133,11 @@ class OpenAI(Provider):
             'stream': False,
             'input': input,
         }
-        data = self._send_json_req(f'{self.endpoint}/responses', model, req)
+        data = self._send_req(f'{self.endpoint}/responses', model, json=req)
         logging.info(self.fmt_openai_stat(data['usage']))
         return data['output'][0]['content']['text']
 
     def transcription(self, model, fp, language='zh'):
-        headers = {}
-        if self.apikey:
-            headers['Authorization'] = f'Bearer {self.apikey}'
         logging.info(f'read file: {fp}')
         with open(fp, 'rb') as fi:
             files = {
@@ -141,13 +148,7 @@ class OpenAI(Provider):
                 'language': (None, language),
                 # 'timestamp_granularities': (None, '["word"]'),
             }
-            logging.info(f'send request to openai: {self.endpoint} {model}')
-            resp = requests.post(f'{self.endpoint}/audio/transcriptions', headers=headers, files=files)
-            logging.info('received response from openai')
-        if resp.status_code >= 400:
-            logging.error(resp.content)
-        resp.raise_for_status()
-        data = resp.json()
+            data = self._send_req(f'{self.endpoint}/audio/transcriptions', model, files=files)
         return data['segments']
 
 
