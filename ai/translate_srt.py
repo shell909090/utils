@@ -17,14 +17,6 @@ from os import path
 import ai
 
 
-def setup_logging(lv):
-    logger = logging.getLogger()
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
-    logger.addHandler(handler)
-    logger.setLevel(lv)
-
-
 re_time = re.compile('(\d+):(\d+):(\d+),(\d+) --> (\d+):(\d+):(\d+),(\d+)')
 def read_srt(fp):
     idx = None
@@ -143,14 +135,9 @@ def proc_srt(fp):
 def main():
     global args
     parser = argparse.ArgumentParser()
-    parser.add_argument('--debug', '-d', action='store_true', help='debug mode')
-    parser.add_argument('--log-level', '-l', default='INFO', help='log level')
-    parser.add_argument('--ollama-endpoint', '-ae', default=os.getenv('OLLAMA_ENDPOINT'), help='ollama endpoint')
-    parser.add_argument('--openai-endpoint', '-ie', default=os.getenv('OPENAI_ENDPOINT'), help='openai endpoint')
-    parser.add_argument('--openai-apikey', '-ik', default=os.getenv('OPENAI_APIKEY'), help='openai apikey')
     parser.add_argument('--model', '-m', default=os.getenv('MODEL'), help='ollama model')
     parser.add_argument('--comparative', '-c', action='store_true', help='output both original text and translated')
-    parser.add_argument('--language', '-lg', default='中文')
+    parser.add_argument('--language', '-l', default='中文')
     parser.add_argument('--prompt', '-p', default='你是一个AI个人助理，请阅读以下材料，将内容翻译为{language}。材料以<start>开始，以</end>结束。注意保持格式不变。注意保持语气。输出内容仅包括翻译结果。')
     parser.add_argument('--interval', '-i', type=int, default=10, help='wait between each API call')
     parser.add_argument('--force-overwrite', '-y', action='store_true')
@@ -158,15 +145,11 @@ def main():
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
 
-    setup_logging(args.log_level.upper())
-
-    if not args.ollama_endpoint and not args.openai_endpoint:
-        args.ollama_endpoint = 'http://127.0.0.1:11434'
-
+    ai.setup_logging()
     args.prompt = args.prompt.format(language=args.language)
 
     global provider
-    provider = ai.make_provider_from_args(args)
+    provider = ai.make_provider()
 
     for fp in args.rest:
         proc_srt(fp)

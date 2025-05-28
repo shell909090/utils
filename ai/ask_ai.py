@@ -28,14 +28,6 @@ headers = {
 }
 
 
-def setup_logging(lv):
-    logger = logging.getLogger()
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
-    logger.addHandler(handler)
-    logger.setLevel(lv)
-
-
 def get_text_from_url(url, raise_status=False):
     from bs4 import BeautifulSoup
     logging.info(f'get content from url: {url}')
@@ -65,12 +57,7 @@ def main():
     global args
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug', '-d', action='store_true', help='debug mode')
-    parser.add_argument('--log-level', '-l', default='INFO', help='log level')
-    parser.add_argument('--ollama-endpoint', '-ae', default=os.getenv('OLLAMA_ENDPOINT'), help='ollama endpoint')
-    parser.add_argument('--openai-endpoint', '-ie', default=os.getenv('OPENAI_ENDPOINT'), help='openai endpoint')
-    parser.add_argument('--openai-apikey', '-ik', default=os.getenv('OPENAI_APIKEY'), help='openai apikey')
     parser.add_argument('--model', '-m', default=os.getenv('MODEL'), help='model')
-    parser.add_argument('--max-context-length', '-c', type=int, default=16384, help='maximum context length')
     parser.add_argument('--remove-think', '-rt', action='store_true', help='remove think')
     parser.add_argument('--from-input', '-fi', action='store_true', help='read background from stdin')
     parser.add_argument('--file', '-f', action='append', help='input file')
@@ -80,12 +67,9 @@ def main():
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
 
-    setup_logging(args.log_level.upper())
+    ai.setup_logging()
 
-    if not args.ollama_endpoint and not args.openai_endpoint:
-        args.ollama_endpoint = 'http://127.0.0.1:11434'
-
-    provider = ai.make_provider_from_args(args)
+    provider = ai.make_provider()
 
     command = '. '.join(args.rest)
     if not command:

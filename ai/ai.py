@@ -8,9 +8,13 @@
 '''
 import os
 import re
+import sys
+import json
+import random
 import logging
 from os import path
 
+import yaml
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
@@ -38,6 +42,7 @@ class Provider(object):
             kwargs['headers'] = {}
         if 'json' in kwargs:
             kwargs['headers']['Content-Type'] = 'application/json'
+            logging.debug(f'req:\n{json.dumps(kwargs["json"], indent=2)}')
         if self.apikey:
             kwargs['headers']['Authorization'] = f'Bearer {self.apikey}'
         logging.info(f'send request to {self.name}: {self.endpoint} {model}')
@@ -46,7 +51,9 @@ class Provider(object):
             logging.error(resp.content)
         resp.raise_for_status()
         logging.info(f'received response from {self.name}')
-        return resp.json()
+        data = resp.json()
+        logging.debug(f'resp:\n{json.dumps(data, indent=2)}')
+        return data
 
     def chat(self, model, messages, remove_think=False, **kwargs):
         response = self._chat(model, messages, **kwargs)
@@ -65,7 +72,7 @@ class Ollama(Provider):
 
     name = 'ollama'
 
-    def __init__(self, endpoint, apikey=None, max_context_length=8192, num_batch=16, retries=3):
+    def __init__(self, endpoint, apikey=None, max_context_length=8192, num_batch=16, retries=3, **kwargs):
         super().__init__(retries)
         self.endpoint = endpoint
         self.apikey = apikey
@@ -116,7 +123,7 @@ class OpenAI(Provider):
 
     name = 'openai'
 
-    def __init__(self, endpoint, apikey=None, retries=3):
+    def __init__(self, endpoint, apikey=None, retries=3, **kwargs):
         super().__init__(retries)
         self.endpoint = endpoint
         self.apikey = apikey
@@ -157,16 +164,29 @@ class OpenAI(Provider):
         return self._send_req(f'{self.endpoint}/audio/transcriptions', model, files=files)['segments']
 
 
-def make_provider_from_args(args):
-    if hasattr(args, 'ollama_endpoint') and args.ollama_endpoint:
-        return Ollama(args.ollama_endpoint, max_context_length=args.max_context_length)
-    elif args.openai_endpoint:
-        return OpenAI(args.openai_endpoint, apikey=args.openai_apikey)
+PROVIDERS = {
+    'ollama': Ollama,
+    'openai': OpenAI,
+}
+
+def make_provider(ai_provider=None):
+    if os.getenv('OLLAMA_ENDPOINT'):
+        cfg = {'type': 'ollama', 'endpoint': os.getenv('OLLAMA_ENDPOINT'),
+               'apikey': os.getenv('OLLAMA_APIKEY'),
+               'max_context_length': os.getenv('MAX_CONTEXT_LENGTH')}
+    elif os.getenv('OPENAI_ENDPOINT'):
+        cfg = {'type': 'openai', 'endpoint': os.getenv('OPENAI_ENDPOINT'), 'apikey': os.getenv('OPENAI_APIKEY')}
     elif os.getenv('GEMINI_APIKEY'):
-        return OpenAI('https://generativelanguage.googleapis.com/v1beta/openai', apikey=os.getenv('GEMINI_APIKEY'))
+        cfg = {'type': 'openai', 'endpoint': 'https://generativelanguage.googleapis.com/v1beta/openai', 'apikey': os.getenv('GEMINI_APIKEY')}
     elif os.getenv('GROQ_APIKEY'):
-        return OpenAI('https://api.groq.com/openai/v1', apikey=os.getenv('GROQ_APIKEY'))
+        cfg = {'type': 'openai', 'endpoint': 'https://api.groq.com/openai/v1', 'apikey': os.getenv('GROQ_APIKEY')}
     elif os.getenv('OPENROUTER_APIKEY'):
-        return OpenAI('https://openrouter.ai/api/v1', apikey=os.getenv('OPENROUTER_APIKEY'))
+        cfg = {'type': 'openai', 'endpoint': 'https://openrouter.ai/api/v1', 'apikey': os.getenv('OPENROUTER_APIKEY')}
     else:
         raise Exception('provider not found in args')
+
+    cfg_type = cfg['type']
+    f = PROVIDERS.get(cfg_type)
+    if not f:
+        raise Exception(f'invaild provider type {cfg_type}')
+    return f(**cfg)

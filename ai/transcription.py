@@ -104,7 +104,7 @@ def pick_gaps(gaps, max_chunk_duration=600):
 
 def cut_off_audio(fp):
     duration = get_duration(fp)
-    gaps = list(detect_slience(fp))
+    gaps = list(detect_slience(fp, args.db))
     gaps.append(duration)
     logging.debug(f'gaps1: {gaps}')
     gaps = list(pick_gaps(gaps))
@@ -171,12 +171,11 @@ def proc_file(provider, fp):
 def main():
     global args
     parser = argparse.ArgumentParser()
-    parser.add_argument('--openai-endpoint', '-ie', default=os.getenv('OPENAI_ENDPOINT'), help='openai endpoint')
-    parser.add_argument('--openai-apikey', '-ik', default=os.getenv('OPENAI_APIKEY'), help='openai apikey')
     parser.add_argument('--models', '-m', default=os.getenv('TRANS_MODELS', 'whisper-large-v3'), help='models')
-    parser.add_argument('--language', '-lg', default='zh', help='language')
+    parser.add_argument('--language', '-l', default='zh', help='language')
     parser.add_argument('--interval', '-i', type=int, default=10, help='wait between each API call')
     parser.add_argument('--force-overwrite', '-y', action='store_true')
+    parser.add_argument('--db', '-db', type=int, default=30, help='db to detect slience')
     parser.add_argument('--disable-txt', '-dt', action='store_true')
     parser.add_argument('--disable-srt', '-ds', action='store_true')
     parser.add_argument('rest', nargs='*', type=str)
@@ -185,7 +184,7 @@ def main():
     ai.setup_logging()
     args.models = args.models.split(',')
 
-    provider = ai.make_provider_from_args(args)
+    provider = ai.make_provider()
 
     for fp in args.rest:
         proc_file(provider, fp)

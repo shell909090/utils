@@ -17,14 +17,6 @@ from os import path
 import ai
 
 
-def setup_logging(lv):
-    logger = logging.getLogger()
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
-    logger.addHandler(handler)
-    logger.setLevel(lv)
-
-
 def source_doc(fp):
     with open(fp) as fi:
         for line in fi:
@@ -79,29 +71,16 @@ def doc_to_file(fo, doc):
 def main():
     global args
     parser = argparse.ArgumentParser()
-    parser.add_argument('--debug', '-d', action='store_true', help='debug mode')
-    parser.add_argument('--log-level', '-l', default='INFO', help='log level')
-    parser.add_argument('--ollama-endpoint', '-ae', default=os.getenv('OLLAMA_ENDPOINT'), help='ollama endpoint')
-    parser.add_argument('--openai-endpoint', '-ie', default=os.getenv('OPENAI_ENDPOINT'), help='openai endpoint')
-    parser.add_argument('--openai-apikey', '-ik', default=os.getenv('OPENAI_APIKEY'), help='openai apikey')
     parser.add_argument('--model', '-m', default=os.getenv('MODEL'), help='ollama model')
-    parser.add_argument('--max-context-length', '-c', type=int, default=8192, help='maximum context length')
     parser.add_argument('--interval', '-iv', type=int, help='let ollama cool down')
     parser.add_argument('--prompt', '-p', default='你是一个AI个人助理，请阅读以下材料，简述主要观点和关键内容。材料以<start>开始，以</end>结束。简述要详细，最好给出引用。无论材料以何种语言书写，你都要用中文总结。')
-    parser.add_argument('--translate-file', '-tr', action='store_true')
     parser.add_argument('--remove-empty-line', '-rel', help='remove empty line')
     parser.add_argument('--chapter-output', '-co', help='filename extension of chapters')
     parser.add_argument('--summary-output', '-so', default='.sum', help='filename extension of summary')
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
 
-    setup_logging(args.log_level.upper())
-
-    if not args.ollama_endpoint and not args.openai_endpoint:
-        args.ollama_endpoint = 'http://127.0.0.1:11434'
-
-    if args.translate_file:
-        args.prompt = '你是一个AI个人助理，请阅读以下材料，将内容翻译为中文。材料以<start>开始，以</end>结束。注意保持格式不变。注意保持语气。输出内容仅包括翻译结果。'
+    ai.setup_logging()
 
     global provider
     provider = ai.make_provider_from_args(args)
