@@ -15,6 +15,14 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 
 
+def setup_logging():
+    logger = logging.getLogger()
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+    logger.addHandler(handler)
+    logger.setLevel(os.getenv('LOG_LEVEL', 'INFO'))
+
+
 class Provider(object):
     re_think = re.compile('<think>.*</think>', re.DOTALL)
     re_code = re.compile('```.*')

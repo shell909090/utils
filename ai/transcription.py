@@ -31,14 +31,6 @@ import ai
 # http_client.HTTPConnection.debuglevel = 1
 
 
-def setup_logging(lv):
-    logger = logging.getLogger()
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
-    logger.addHandler(handler)
-    logger.setLevel(lv)
-
-
 class Writer(object):
 
     def __init__(self, fp):
@@ -154,7 +146,7 @@ def transcription(provider, fp):
 
 def proc_file(provider, fp):
     basefp = path.splitext(fp)[0]
-    if not args.force_overwrite and path.exists(f'{basefp}.txt') or path.exists(f'{basefp}.srt'):
+    if not args.force_overwrite and (path.exists(f'{basefp}.txt') or path.exists(f'{basefp}.srt')):
         logging.info(f'{fp} has been processed before.')
         return
     logging.info(f'process {fp}')
@@ -179,8 +171,6 @@ def proc_file(provider, fp):
 def main():
     global args
     parser = argparse.ArgumentParser()
-    parser.add_argument('--debug', '-d', action='store_true', help='debug mode')
-    parser.add_argument('--log-level', '-l', default='INFO', help='log level')
     parser.add_argument('--openai-endpoint', '-ie', default=os.getenv('OPENAI_ENDPOINT'), help='openai endpoint')
     parser.add_argument('--openai-apikey', '-ik', default=os.getenv('OPENAI_APIKEY'), help='openai apikey')
     parser.add_argument('--models', '-m', default=os.getenv('TRANS_MODELS', 'whisper-large-v3'), help='models')
@@ -192,7 +182,7 @@ def main():
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
 
-    setup_logging(args.log_level.upper())
+    ai.setup_logging()
     args.models = args.models.split(',')
 
     provider = ai.make_provider_from_args(args)
