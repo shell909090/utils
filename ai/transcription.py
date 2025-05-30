@@ -12,9 +12,11 @@ monkey.patch_all()
 import os
 import re
 import sys
+import json
 import math
 import time
 import random
+import shutil
 import logging
 import argparse
 import datetime
@@ -107,41 +109,78 @@ def cut_off_audio(fp):
     gaps = list(detect_slience(fp, args.db))
     gaps.append(duration)
     logging.debug(f'gaps1: {gaps}')
-    gaps = list(pick_gaps(gaps))
+    gaps = list(pick_gaps(gaps, args.max_chunk_duration))
     gaps.insert(0, 0)
     logging.info(f'audio will be splited to {len(gaps)-1} chunks')
     logging.debug(f'gaps2: {gaps}')
     return gaps
 
 
-def pre_processing_audio(fp, i, start, end, td):
+def pre_processing_audio(src, i, start, end, dst):
     logging.info(f'split audio chunk {i}, start: {start}, end: {end}, duration: {end-start}')
-    command = ['ffmpeg', '-i', fp, '-ar', '16000', '-ac', '1',
+    if path.exists(dst):
+        logging.info(f'audio chunk exists: {dst}')
+        return
+    logging.info(f'create audio chunk: {dst}')
+    command = ['ffmpeg', '-i', src, '-ar', '16000', '-ac', '1',
                '-ss', str(datetime.timedelta(seconds=start)),
                '-to', str(datetime.timedelta(seconds=end)),
-               f'{td}/{i}.mp3']
+               dst]
     p = subprocess.run(command, stderr=subprocess.DEVNULL)
-    return f'{td}/{i}.mp3'
+
+
+def transcription_chunk(provider, chunkfile, segfile):
+    if path.exists(segfile):
+        logging.info(f'load segments: {segfile}')
+        with open(segfile) as fi:
+            return json.load(fi)
+
+    logging.info(f'waiting {args.interval} seconds')
+    time.sleep(args.interval)
+
+    with open(chunkfile, 'rb') as fi:
+        segments = provider.transcription(
+            random.choice(args.models), path.basename(chunkfile), fi, language=args.language)
+
+    logging.info(f'dump segments: {segfile}')
+    with open(segfile, 'w') as fo:
+        json.dump(segments, fo)
+    return segments
 
 
 def transcription(provider, fp):
-    gaps = cut_off_audio(fp)
-    with tempfile.TemporaryDirectory() as td:
-        i = 0
-        while len(gaps) > 1:
-            tmpfile = pre_processing_audio(fp, i, gaps[0], gaps[1], td)
-            logging.info(f'read file: {tmpfile}')
-            with open(tmpfile, 'rb') as fi:
-                segments = provider.transcription(
-                    random.choice(args.models), path.basename(tmpfile), fi, language=args.language)
-            for s in segments:
-                s['start'] += gaps[0]
-                s['end'] += gaps[0]
-                yield s
-            logging.info(f'waiting {args.interval} seconds')
-            time.sleep(args.interval)
-            i += 1
-            gaps.pop(0)
+    if args.load_temp:
+        tmpdir = args.load_temp
+        logging.info(f'load gaps: {tmpdir}/gaps.json')
+        with open(path.join(tmpdir, 'gaps.json')) as fi:
+            gaps = json.load(fi)
+    else:
+        tmpdir = tempfile.mkdtemp()
+        logging.info(f'use tmpdir: {tmpdir}')
+        gaps = cut_off_audio(fp)
+        logging.info(f'dump gaps: {tmpdir}/gaps.json')
+        with open(path.join(tmpdir, 'gaps.json'), 'w') as fo:
+            json.dump(gaps, fo)
+
+    i = 0
+    while len(gaps) > 1:
+        chunkfile = f'{tmpdir}/{i}.mp3'
+        pre_processing_audio(fp, i, gaps[0], gaps[1], chunkfile)
+
+        segfile = f'{tmpdir}/{i}.json'
+        segments = transcription_chunk(provider, chunkfile, segfile)
+
+        for s in segments:
+            s['start'] += gaps[0]
+            s['end'] += gaps[0]
+            yield s
+
+        i += 1
+        gaps.pop(0)
+
+    if args.clean_up_temp:
+        logging.info(f'cleanup tmpdir: {tmpdir}')
+        shutil.rmtree(tmpdir)
 
 
 def proc_file(provider, fp):
@@ -173,9 +212,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--models', '-m', default=os.getenv('TRANS_MODELS', 'whisper-large-v3'), help='models')
     parser.add_argument('--language', '-l', default='zh', help='language')
+    parser.add_argument('--load-temp', '-lt', help='load everything from temp dir')
+    parser.add_argument('--clean-up-temp', '-ct', action='store_true', help='clean up temp dir after finish')
+    parser.add_argument('--max-chunk-duration', '-mcd', type=int, default=300, help='maximum seconds one audio chunk could have')
     parser.add_argument('--interval', '-i', type=int, default=10, help='wait between each API call')
     parser.add_argument('--force-overwrite', '-y', action='store_true')
-    parser.add_argument('--db', '-db', type=int, default=30, help='db to detect slience')
+    parser.add_argument('--db', '-db', type=int, default=20, help='db to detect slience')
     parser.add_argument('--disable-txt', '-dt', action='store_true')
     parser.add_argument('--disable-srt', '-ds', action='store_true')
     parser.add_argument('rest', nargs='*', type=str)
