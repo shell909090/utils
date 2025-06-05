@@ -32,10 +32,15 @@ class Provider(object):
     re_code = re.compile('```.*')
 
     def __init__(self, retries):
+        adapter = HTTPAdapter(
+            max_retries=Retry(
+                total=retries,
+                backoff_factor=1,
+                allowed_methods=frozenset(['GET', 'POST']),
+                status_forcelist=[500, 502, 503, 504]))
         self.sess = requests.Session()
-        self.retries = Retry(total=retries, backoff_factor=0.1, status_forcelist=[500, 502, 503, 504])
-        self.sess.mount('http://', HTTPAdapter(max_retries=self.retries))
-        self.sess.mount('https://', HTTPAdapter(max_retries=self.retries))
+        self.sess.mount('http://', adapter)
+        self.sess.mount('https://', adapter)
 
     def _send_req(self, url, model, **kwargs):
         if 'headers' not in kwargs:

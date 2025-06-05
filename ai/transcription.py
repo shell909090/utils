@@ -36,7 +36,7 @@ import ai
 class Writer(object):
 
     def __init__(self, fp):
-        self.f = open(fp, 'a')
+        self.f = open(fp, 'w')
         self.i = 0
 
     def close(self):
@@ -76,8 +76,8 @@ def get_duration(fp):
 
 
 re_silence_start = re.compile('.*silence_start: (.*)')
-def detect_slience(fp, db=30, duration=0.5):
-    logging.info('detect slience')
+def detect_silence(fp, db=30, duration=0.5):
+    logging.info('detect silence')
     command = ['ffmpeg', '-i', fp, '-af', f'silencedetect=n=-{db}dB:d={duration}', '-f', 'null', '-']
     p = subprocess.run(command, capture_output=True)
     stderr = p.stderr.decode('utf-8')
@@ -106,12 +106,11 @@ def pick_gaps(gaps, max_chunk_duration=600):
 
 def cut_off_audio(fp):
     duration = get_duration(fp)
-    gaps = list(detect_slience(fp, args.db))
+    gaps = list(detect_silence(fp, args.db))
     gaps.append(duration)
     logging.debug(f'gaps1: {gaps}')
     gaps = list(pick_gaps(gaps, args.max_chunk_duration))
     gaps.insert(0, 0)
-    logging.info(f'audio will be splited to {len(gaps)-1} chunks')
     logging.debug(f'gaps2: {gaps}')
     return gaps
 
@@ -162,6 +161,7 @@ def transcription(provider, fp):
         with open(path.join(tmpdir, 'gaps.json'), 'w') as fo:
             json.dump(gaps, fo)
 
+    logging.info(f'audio will be splited to {len(gaps)-1} chunks')
     i = 0
     while len(gaps) > 1:
         chunkfile = f'{tmpdir}/{i}.mp3'
@@ -217,7 +217,7 @@ def main():
     parser.add_argument('--max-chunk-duration', '-mcd', type=int, default=300, help='maximum seconds one audio chunk could have')
     parser.add_argument('--interval', '-i', type=int, default=10, help='wait between each API call')
     parser.add_argument('--force-overwrite', '-y', action='store_true')
-    parser.add_argument('--db', '-db', type=int, default=20, help='db to detect slience')
+    parser.add_argument('--db', '-db', type=int, default=35, help='db to detect silence')
     parser.add_argument('--disable-txt', '-dt', action='store_true')
     parser.add_argument('--disable-srt', '-ds', action='store_true')
     parser.add_argument('rest', nargs='*', type=str)
