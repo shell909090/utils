@@ -39,7 +39,7 @@ endef
 export ROUTES_LIST_EXTRA
 routes.list.gz: routes.txt
 	echo "$$ROUTES_LIST_EXTRA" > extra_routes.list
-	cat routes.txt extra_routes.list | python3 ip-merger.py | gzip > routes.list.gz
+	cat routes.txt extra_routes.list | python3 ip-merger.py | gzip > $@
 	rm extra_routes.list
 
 define PYTHON_ROUTES_SH
@@ -51,7 +51,22 @@ for line in sys.stdin:
 endef
 
 export PYTHON_ROUTES_SH
-routes.sh:
-	cat routes.txt | python3 ip-merger.py | python3 -c "$$PYTHON_ROUTES_SH" > routes.sh
+routes.sh: routes.txt
+	cat routes.txt | python3 ip-merger.py | python3 -c "$$PYTHON_ROUTES_SH" > $@
+
+define PYTHON_ROUTES_SH
+import sys
+print('''#!/bin/bash
+
+ACTION=add
+GATEWAY=192.168.0.1
+''')
+for line in sys.stdin:
+  print(f'route -n "$$ACTION" -net {line.strip()} "$$GATEWAY"')
+endef
+
+export PYTHON_ROUTES_SH
+routes-mac.sh: routes.txt
+	cat routes.txt | python3 ip-merger.py | python3 -c "$$PYTHON_ROUTES_SH" > $@
 
 ### Makefile ends here
