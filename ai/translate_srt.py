@@ -28,8 +28,8 @@ def read_srt(fp):
         for line in fi:
             line = line.strip()
 
-            if not line:
-                yield {'index': idx, 'start': start, 'end': end, 'text': text.rstrip()}
+            if not line and text.strip():
+                yield {'index': idx, 'start': start, 'end': end, 'text': text.strip()}
                 idx = None
                 start = None
                 end = None
