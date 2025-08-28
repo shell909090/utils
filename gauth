@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 '''
 @date: 2015-09-25
@@ -10,9 +10,10 @@ import sys
 import time
 import hmac
 import base64
-import getopt
 import struct
 import hashlib
+import argparse
+
 
 def calotp(secret):
     secret = base64.b32decode(secret)
@@ -22,14 +23,19 @@ def calotp(secret):
     number = struct.unpack('>I', h[offset: offset+4])[0]
     return '%06d' % ((number & 0x7fffffff) % 1000000)
 
+
 def main():
-    optlist, args = getopt.getopt(sys.argv[1:], 'h')
-    optdict = dict(optlist)
-    if '-h' in optdict:
-        print main.__doc__
-        return
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument('rest', nargs='*', type=str)
+    args = parser.parse_args()
 
-    for line in sys.stdin:
-        print calotp(line.strip())
+    if not args.rest:
+        for sec in args.rest:
+            print(calotp(sec))
+    else:
+        for line in sys.stdin:
+            print(calotp(line.strip()))
 
-if __name__ == '__main__': main()
+
+if __name__ == '__main__':
+    main()
