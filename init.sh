@@ -12,10 +12,10 @@ _aptsrc() {
     CFG=/etc/apt/sources.list
     if [ ! -e $CFG ]; then
 	cat > $CFG <<EOF
-deb http://ftp.cn.debian.org/debian/ bookworm main contrib non-free non-free-firmware
-deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
-deb http://ftp.cn.debian.org/debian/ bookworm-updates main contrib non-free non-free-firmware
-deb http://ftp.cn.debian.org/debian/ bookworm-backports main contrib non-free non-free-firmware
+deb http://ftp.cn.debian.org/debian/ trixie main contrib non-free non-free-firmware
+deb http://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+deb http://ftp.cn.debian.org/debian/ trixie-updates main contrib non-free non-free-firmware
+deb http://ftp.cn.debian.org/debian/ trixie-backports main contrib non-free non-free-firmware
 EOF
     fi
 }
@@ -153,12 +153,6 @@ _pubkey() {
     chmod 700 ~/.ssh/
     if [[ ! -e ~/.ssh/authorized_keys ]]; then
 	touch ~/.ssh/authorized_keys
-    fi
-    if ! grep 'shell@201602' ~/.ssh/authorized_keys
-    then
-	cat >> ~/.ssh/authorized_keys <<EOF
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIANXSjD8YRhbmqr5tyjwQIRnqi4BMGY2CPbiGf/3EvWf shell@201602
-EOF
     fi
     if ! grep '202302' ~/.ssh/authorized_keys
     then
