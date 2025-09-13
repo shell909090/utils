@@ -157,7 +157,7 @@ _pubkey() {
     if ! grep '202302' ~/.ssh/authorized_keys
     then
 	cat >> ~/.ssh/authorized_keys <<EOF
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMPG3Ci4r5R/coysaSe4Dbsbd+R5lYtXXFVG2Hx2NAIg 202302
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBQzrNhnDScWLHfASI9b4s8t7OHJksUet2Sbia8alHoA 202509
 EOF
     fi
     chmod 600 ~/.ssh/authorized_keys
