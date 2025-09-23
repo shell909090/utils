@@ -20,6 +20,9 @@ from requests.adapters import HTTPAdapter, Retry
 
 
 def setup_logging():
+    """
+    设置日志记录器。
+    """
     logger = logging.getLogger()
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
@@ -169,9 +172,80 @@ class OpenAI(Provider):
         return self._send_req(f'{self.endpoint}/audio/transcriptions', model, files=files)['segments']
 
 
+class Gemini(Provider):
+    """
+    Google Gemini AI服务提供商的实现。
+    """
+
+    name = 'gemini'
+
+    def __init__(self, endpoint, apikey=None, retries=3, **kwargs):
+        super().__init__(retries)
+        self.endpoint = endpoint
+        self.apikey = apikey
+
+    def _send_gemini_req(self, url, model, **kwargs):
+        if 'headers' not in kwargs:
+            kwargs['headers'] = {}
+        if 'json' in kwargs:
+            kwargs['headers']['Content-Type'] = 'application/json'
+            logging.debug(f'req:\n{json.dumps(kwargs["json"], indent=2)}')
+        if self.apikey:
+            kwargs['headers']['x-goog-api-key'] = self.apikey
+        logging.info(f'send request to {self.name}: {self.endpoint} {model}')
+        resp = self.sess.post(url, **kwargs)
+        if resp.status_code >= 400:
+            logging.error(resp.content)
+        resp.raise_for_status()
+        logging.info(f'received response from {self.name}')
+        data = resp.json()
+        logging.debug(f'resp:\n{json.dumps(data, indent=2)}')
+        return data
+
+    def _chat(self, model, messages, thinking_budget=None):
+        contents = []
+        for message in messages:
+            role = message.get('role')
+            content = message.get('content')
+            if not role or not content:
+                continue
+            # Gemini API expects 'user' or 'model' roles, mapping 'assistant' to 'model'
+            gemini_role = 'model' if role == 'assistant' else role
+            contents.append({
+                'role': gemini_role,
+                'parts': [{'text': content}]
+            })
+
+        req_body = {"contents": contents}
+        if thinking_budget is not None:
+            req_body['generationConfig'] = {
+                "thinkingConfig": {
+                    "thinkingBudget": thinking_budget
+                }
+            }
+        url = f'{self.endpoint}/models/{model}:generateContent'
+        resp = self._send_gemini_req(url, model, json=req_body)
+
+        # Extracting the response content
+        response_text = ""
+        if resp and 'candidates' in resp and resp['candidates']:
+            for candidate in resp['candidates']:
+                if 'content' in candidate and 'parts' in candidate['content']:
+                    for part in candidate['content']['parts']:
+                        if 'text' in part:
+                            response_text += part['text']
+        return response_text
+
+    def _generate(self, model, input_text, thinking_budget=None):
+        messages = [{'role': 'user', 'content': input_text}]
+        return self._chat(model, messages, thinking_budget)
+
+
+
 PROVIDERS = {
     'ollama': Ollama,
     'openai': OpenAI,
+    'gemini': Gemini,
 }
 
 def make_provider(ai_provider=None):
@@ -182,7 +256,8 @@ def make_provider(ai_provider=None):
     elif os.getenv('OPENAI_ENDPOINT'):
         cfg = {'type': 'openai', 'endpoint': os.getenv('OPENAI_ENDPOINT'), 'apikey': os.getenv('OPENAI_APIKEY')}
     elif os.getenv('GEMINI_APIKEY'):
-        cfg = {'type': 'openai', 'endpoint': 'https://generativelanguage.googleapis.com/v1beta/openai', 'apikey': os.getenv('GEMINI_APIKEY')}
+        # cfg = {'type': 'openai', 'endpoint': 'https://generativelanguage.googleapis.com/v1beta/openai', 'apikey': os.getenv('GEMINI_APIKEY')}
+        cfg = {'type': 'gemini', 'endpoint': 'https://generativelanguage.googleapis.com/v1beta', 'apikey': os.getenv('GEMINI_APIKEY')}
     elif os.getenv('GROQ_APIKEY'):
         cfg = {'type': 'openai', 'endpoint': 'https://api.groq.com/openai/v1', 'apikey': os.getenv('GROQ_APIKEY')}
     elif os.getenv('OPENROUTER_APIKEY'):
