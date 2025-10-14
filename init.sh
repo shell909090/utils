@@ -141,7 +141,7 @@ _user() {
     CFG=~/.bashrc
     if ! grep '^PATH' "$CFG"
     then
-	sed -i '1iPATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' "$CFG"
+	sed -i '4iPATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:~/bin:~/.local/bin"' "$CFG"
     fi
     set-bash-config "export EDITOR" "$EDITOR"
     set-bash-config "export DEBEMAIL" "$EMAIL"
@@ -154,10 +154,10 @@ _pubkey() {
     if [[ ! -e ~/.ssh/authorized_keys ]]; then
 	touch ~/.ssh/authorized_keys
     fi
-    if ! grep 'AAAAC3NzaC1lZDI1NTE5AAAAIBQzrNhnDScWLHfASI9b4s8t7OHJksUet2Sbia8alHoA' ~/.ssh/authorized_keys
+    if ! grep 'AAAAC3NzaC1lZDI1NTE5AAAAIDY68j54g7G5+xE4qJ8RmotQwa3PR3RQO3Fy+sICrxQv' ~/.ssh/authorized_keys
     then
 	cat >> ~/.ssh/authorized_keys <<EOF
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBQzrNhnDScWLHfASI9b4s8t7OHJksUet2Sbia8alHoA 202509
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDY68j54g7G5+xE4qJ8RmotQwa3PR3RQO3Fy+sICrxQv 202511
 EOF
     fi
     chmod 600 ~/.ssh/authorized_keys
