@@ -160,6 +160,12 @@ _pubkey() {
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDY68j54g7G5+xE4qJ8RmotQwa3PR3RQO3Fy+sICrxQv 202511
 EOF
     fi
+    if ! grep 'lioPRFbqzgqqlffpcQp8ydgY11gXVx8ZZ0ZRfBvDAZi2wvXJoirzCb0OrPwAPpYo5EtxJe3wo' ~/.ssh/authorized_keys
+    then
+	cat >> ~/.ssh/authorized_keys <<EOF
+ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzODQAAABhBNs4EbH/lioPRFbqzgqqlffpcQp8ydgY11gXVx8ZZ0ZRfBvDAZi2wvXJoirzCb0OrPwAPpYo5EtxJe3wo/QOc3iHNlNOJxd2MhZ1vedFZ/cRo9Qp+uaAKhZ1JMexvfXlrQ== ybk5c-ecp384-202510
+EOF
+    fi
     chmod 600 ~/.ssh/authorized_keys
 }
 
