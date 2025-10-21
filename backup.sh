@@ -10,7 +10,7 @@ read -s -p "Enter your password: " PASSWORD
 echo ''
 
 echo "create backup."
-ssh "$TGT" <<EOF
+ssh -o ControlMaster=yes -o ControlPath=/tmp/ssh_mux_%h_%p_%r -o ControlPersist=1m "$TGT" <<EOF
 pushd .
 TMPDIR=\$(mktemp -d)
 cd \$TMPDIR
@@ -21,14 +21,16 @@ FULLPATH=\$(realpath ~/configs)
 echo $PASSWORD | sudo -S bash -c "while read i; do tar uf backup.tar \\\$i; done < \$FULLPATH"
 test -x ~/backup.sh && tar uf backup.tar ~/backup.sh
 test -x ~/backup.sh && ~/backup.sh
-echo $PASSWORD | sudo -S chown \$SUDO_UID:\$SUDO_GID backup.tar
 gzip -c backup.tar > ~/backup.tar.gz
 popd
 rm -rf \$TMPDIR
 EOF
 
 echo "copy backup back"
-ssh "$TGT" 'cat backup.tar.gz' | gpg -e -r 0xC9A514BA45DE0475! > "$TGT.tar.gz.gpg"
+ssh -o ControlMaster=no -o ControlPath=/tmp/ssh_mux_%h_%p_%r -o ControlPersist=1m "$TGT" 'cat backup.tar.gz' | gpg -e -r 0xC9A514BA45DE0475! > "$TGT.tar.gz.gpg"
 
 echo "cleanup remote"
-ssh "$TGT" 'rm -rf ~/backup.tar.gz'
+ssh -o ControlMaster=no -o ControlPath=/tmp/ssh_mux_%h_%p_%r -o ControlPersist=1m "$TGT" 'rm -rf ~/backup.tar.gz'
+
+echo "close control master"
+ssh -o ControlMaster=no -o ControlPath=/tmp/ssh_mux_%h_%p_%r -o ControlPersist=1m -O exit "$TGT"
