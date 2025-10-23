@@ -1,0 +1,10 @@
+[project]
+name = "cve"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "gevent>=25.9.1",
+    "nvdlib>=0.8.3",
+]
