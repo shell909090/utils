@@ -7,7 +7,9 @@
 @license: BSD-3-clause
 '''
 import sys
+import json
 import getopt
+import argparse
 import configparser
 
 
@@ -30,7 +32,7 @@ def translate_ips(ips):
 
 
 def gen_peer(cfg, name):
-    pcfg = dict(cfg.items(name))
+    pcfg = dict(cfg[name])
     conf = []
 
     iface = {
@@ -39,13 +41,16 @@ def gen_peer(cfg, name):
     }
     copy_in_case(iface, 'Address', pcfg, 'address')
     copy_in_case(iface, 'DNS', pcfg, 'dns')
+    copy_in_case(iface, 'MTU', pcfg, 'mtu')
+    copy_in_case(iface, 'PostUp', pcfg, 'postup')
+    copy_in_case(iface, 'PostDown', pcfg, 'postdown')
     conf.append(fmt_data('Interface', iface))
 
     for pname in cfg.sections():
         if pname == name:
             continue
-        pcfg = dict(cfg.items(pname))
-        if '-a' not in optdict and not pcfg.get('host'):
+        pcfg = dict(cfg[pname])
+        if not args.all and not pcfg.get('host'):
             continue
         if pcfg.get('disable'):
             continue
@@ -69,28 +74,29 @@ def gen_peer(cfg, name):
 
 
 def main():
-    ''' wgmgr list/[config name] '''
-
-    global optdict
-    optlist, args = getopt.getopt(sys.argv[1:], 'ah')
-    optdict = dict(optlist)
-    if '-h' in optdict:
-        print(main.__doc__)
-        return
-
-    if len(args) < 2:
-        print(main.__doc__)
+    global args
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--all', '-a', action='store_true')
+    parser.add_argument('--list', '-l', action='store_true')
+    parser.add_argument('--json-map', '-jm', action='store_true')
+    parser.add_argument('rest', nargs='*', type=str)
+    args = parser.parse_args()
 
     cfg = configparser.ConfigParser()
-    cfg.read(args[0])
+    cfg.read(args.rest[0])
 
-    cmd = args[1]
-    if cmd == 'list':
-        print('\n'.join([name for name in cfg.sections()]))
-    elif cmd in cfg.sections():
-        print(gen_peer(cfg, cmd))
-    else:
-        print(main.__doc__)
+    if args.list:
+        print('\n'.join([name for name in cfg]))
+        return
+
+    if args.json_map:
+        json_map = {cfg[name]['public']: name for name in cfg if 'public' in cfg[name]}
+        print(json.dumps(json_map, indent=2))
+        return
+
+    peer = args.rest[1]
+    if peer in cfg.sections():
+        print(gen_peer(cfg, peer))
 
 
 if __name__ == '__main__':
