@@ -14,7 +14,6 @@ import logging.handlers
 import smtplib
 import argparse
 import subprocess
-import configparser
 from os import path
 from email.mime.text import MIMEText
 
@@ -41,8 +40,8 @@ def run(cmd):
     return p.stdout
 
 
-def wgshow():
-    output = run(['wg', 'show', args.iface]).decode('utf-8')
+def wgshow(iface):
+    output = run(['wg', 'show', iface]).decode('utf-8')
     status = {}
     for line in output.splitlines():
         line = line.strip()
@@ -76,11 +75,9 @@ def filter_new(src, timeout=300):
             yield status
 
 
-def read_cfg_get_name(cfgpath):
-    cfg = configparser.ConfigParser()
-    cfg.read(path.expanduser(cfgpath))
-    for name in cfg.sections():
-        yield cfg.get(name, 'public'), name
+def load_map(fp):
+    with open(fp) as fi:
+        return json.load(fi)
 
 
 def map_name(src, names):
@@ -98,12 +95,12 @@ def diff_status(cur, his):
     new = cur.keys() - his.keys()
     timeouted = his.keys() - cur.keys()
     for name in new:
-        yield 'user login, name: {peer}, endpoint: {endpoint}, ago: {ago}'.format(**cur[name])
+        yield 'user login, name: {name}, endpoint: {endpoint}, ago: {ago}'.format(**cur[name])
         his[name] = cur[name]
     for name in timeouted:
         status = his[name]
         status['ago'] = (st-status['handshake_timestamp'])
-        yield 'user timeout, name: {peer}, endpoint: {endpoint}, ago: {ago}'.format(**status)
+        yield 'user timeout, name: {name}, endpoint: {endpoint}, ago: {ago}'.format(**status)
         del his[name]
 
 
@@ -122,18 +119,21 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--loglevel', '-l', default='INFO', help='log level')
     parser.add_argument('--iface', '-i', default='wg0', help='wg interface')
-    parser.add_argument('--timeout', '-t', type=int, default=300, help='how long will peer timeout')
-    parser.add_argument('--db', '-db', default='~/wg/wg0.status.json', help='wg status file')
+    parser.add_argument('--timeout', '-t', type=int, default=900, help='how long will peer timeout')
+    parser.add_argument('--map', '-m', default='/etc/wireguard/{iface}.map.json', help='wg map file')
+    parser.add_argument('--status', '-st', default='/etc/wireguard/{iface}.status.json', help='wg status file')
     parser.add_argument('--printout', '-p', action='store_true', help='print out status and quit')
-    parser.add_argument('--syslog', '-sl', help='syslog server')
+    parser.add_argument('--syslog', '-sl', default='127.0.0.1', help='syslog server')
     parser.add_argument('--smtp', '-s', help='smtp server')
-    parser.add_argument('--sender' help='sender email address')
-    parser.add_argument('--to', help='receiver email address')
+    parser.add_argument('--sender', default='wg@router.lan', help='sender email address')
+    parser.add_argument('--to', default='warn@web.lan', help='receiver email address')
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
     setup_logging(args.loglevel)
 
-    status = filter_new(cal_time(wgshow()), args.timeout)
+    status = filter_new(cal_time(wgshow(args.iface)), args.timeout)
+    if args.map:
+        status = map_name(status, load_map(args.map.format(iface=args.iface)))
     status = list2dict(status, 'peer')
     logging.debug('current: %s', json.dumps(status, indent=2))
 
@@ -142,7 +142,7 @@ def main():
         return
 
     try:
-        with open(path.expanduser(args.db)) as fi:
+        with open(path.expanduser(args.status)) as fi:
             historial_status = json.load(fi)
     except:
         historial_status = {}
@@ -164,9 +164,9 @@ def main():
     if args.smtp:
         sendmail('\n'.join(diff))
 
-    with open(path.expanduser(args.db), 'w') as fo:
+    with open(path.expanduser(args.status), 'w') as fo:
         json.dump(historial_status, fo, indent=2)
-    logging.info(f'update db: {args.db}')
+    logging.info(f'update db: {args.status}')
 
 
 if __name__ == '__main__':
