@@ -114,7 +114,7 @@ class Search(object):
 
     def register(self, parser):
         parser.add_argument('--files-only', '-f', action='store_true', help='search only file.')
-        parser.add_argument('--ignore-case', '-i', help='ignore case.')
+        parser.add_argument('--ignore-case', '-i', action='store_true', help='ignore case.')
         parser.add_argument('pattern', nargs='?', type=str)
 
     def execute(self):
@@ -162,5 +162,5 @@ def main():
 if __name__ == '__main__':
     import uft
     import uft_dup
-    import uft_mount
+    # import uft_mount
     uft.main()
