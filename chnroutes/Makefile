@@ -45,7 +45,7 @@ routes.list.gz: routes.txt
 define PYTHON_ROUTES_SH
 import sys
 print('''#!/bin/bash
-''')
+(ip route list table fout | grep ppp0 > /dev/null) && exit 0''')
 for line in sys.stdin:
   print(f'ip route add {line.strip()} table fout dev ppp0')
 endef
@@ -54,7 +54,7 @@ export PYTHON_ROUTES_SH
 routes.sh: routes.txt
 	cat routes.txt | python3 ip-merger.py | python3 -c "$$PYTHON_ROUTES_SH" > $@
 
-define PYTHON_ROUTES_SH
+define PYTHON_ROUTES_SH_MAC
 import sys
 print('''#!/bin/bash
 
@@ -65,8 +65,8 @@ for line in sys.stdin:
   print(f'route -n "$$ACTION" -net {line.strip()} "$$GATEWAY"')
 endef
 
-export PYTHON_ROUTES_SH
+export PYTHON_ROUTES_SH_MAC
 routes-mac.sh: routes.txt
-	cat routes.txt | python3 ip-merger.py | python3 -c "$$PYTHON_ROUTES_SH" > $@
+	cat routes.txt | python3 ip-merger.py | python3 -c "$$PYTHON_ROUTES_SH_MAC" > $@
 
 ### Makefile ends here
