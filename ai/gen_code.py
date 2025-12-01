@@ -15,9 +15,6 @@ from bs4 import BeautifulSoup
 
 import ai
 
-# import http.client as http_client
-# http_client.HTTPConnection.debuglevel = 1
-
 
 def main():
     global args
@@ -30,13 +27,13 @@ def main():
     ai.setup_logging()
     provider = ai.make_provider()
 
-    messages = []
+    prompt = ''
 
     for fp in args.rest:
         with open(fp) as fi:
-            messages.append({'role': 'user', 'content': fi.read()})
+            prompt += fi.read()
 
-    response = provider.chat(args.model, messages, remove_think=True)
+    response = provider.generate(args.model, prompt, remove_think=True)
     response = provider.re_code.sub('', response)
 
     with open(args.output, 'w') as fo:
