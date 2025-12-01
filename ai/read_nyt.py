@@ -15,9 +15,6 @@ from bs4 import BeautifulSoup
 
 import ai
 
-# import http.client as http_client
-# http_client.HTTPConnection.debuglevel = 1
-
 
 def get_text(u):
     resp = httpx.get(u)
@@ -39,7 +36,6 @@ def read_article(provider, args, u):
 
 
 def main():
-    global args
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', '-m', default=os.getenv('MODEL'), help='model')
     parser.add_argument('rest', nargs='*', type=str)

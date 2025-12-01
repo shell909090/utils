@@ -14,9 +14,7 @@ import random
 import logging
 from os import path
 
-import yaml
-import requests
-from requests.adapters import HTTPAdapter, Retry
+import httpx
 
 
 def setup_logging():
@@ -25,7 +23,7 @@ def setup_logging():
     """
     logger = logging.getLogger()
     handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+    handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
     logger.addHandler(handler)
     logger.setLevel(os.getenv('LOG_LEVEL', 'INFO'))
 
@@ -35,15 +33,8 @@ class Provider(object):
     re_code = re.compile('```.*')
 
     def __init__(self, retries):
-        self.sess = requests.Session()
-        # adapter = HTTPAdapter(
-        #     max_retries=Retry(
-        #         total=retries,
-        #         backoff_factor=1,
-        #         allowed_methods=frozenset(['GET', 'POST']),
-        #         status_forcelist=[500, 502, 503, 504]))
-        # self.sess.mount('http://', adapter)
-        # self.sess.mount('https://', adapter)
+        transport = httpx.HTTPTransport(retries=retries)
+        self.sess = httpx.Client(transport=transport)
 
     def _send_req(self, url, model, **kwargs):
         if 'headers' not in kwargs:
@@ -241,32 +232,16 @@ class Gemini(Provider):
         return self._chat(model, messages, thinking_budget)
 
 
-
-PROVIDERS = {
-    'ollama': Ollama,
-    'openai': OpenAI,
-    'gemini': Gemini,
-}
-
-def make_provider(ai_provider=None):
+def make_provider():
     if os.getenv('OLLAMA_ENDPOINT'):
-        cfg = {'type': 'ollama', 'endpoint': os.getenv('OLLAMA_ENDPOINT'),
-               'apikey': os.getenv('OLLAMA_APIKEY'),
-               'max_context_length': os.getenv('MAX_CONTEXT_LENGTH')}
+        return Ollama(os.getenv('OLLAMA_ENDPOINT'), os.getenv('OLLAMA_APIKEY'), os.getenv('MAX_CONTEXT_LENGTH'))
     elif os.getenv('OPENAI_ENDPOINT'):
-        cfg = {'type': 'openai', 'endpoint': os.getenv('OPENAI_ENDPOINT'), 'apikey': os.getenv('OPENAI_APIKEY')}
+        return OpenAI(os.getenv('OPENAI_ENDPOINT'), os.getenv('OPENAI_APIKEY'))
     elif os.getenv('GEMINI_APIKEY'):
-        # cfg = {'type': 'openai', 'endpoint': 'https://generativelanguage.googleapis.com/v1beta/openai', 'apikey': os.getenv('GEMINI_APIKEY')}
-        cfg = {'type': 'gemini', 'endpoint': 'https://generativelanguage.googleapis.com/v1beta', 'apikey': os.getenv('GEMINI_APIKEY')}
+        return Gemini('https://generativelanguage.googleapis.com/v1beta', os.getenv('GEMINI_APIKEY'))
     elif os.getenv('GROQ_APIKEY'):
-        cfg = {'type': 'openai', 'endpoint': 'https://api.groq.com/openai/v1', 'apikey': os.getenv('GROQ_APIKEY')}
+        return OpenAI('https://api.groq.com/openai/v1', os.getenv('GROQ_APIKEY'))
     elif os.getenv('OPENROUTER_APIKEY'):
-        cfg = {'type': 'openai', 'endpoint': 'https://openrouter.ai/api/v1', 'apikey': os.getenv('OPENROUTER_APIKEY')}
+        return OpenAI('https://openrouter.ai/api/v1', os.getenv('OPENROUTER_APIKEY'))
     else:
         raise Exception('provider not found in args')
-
-    cfg_type = cfg['type']
-    f = PROVIDERS.get(cfg_type)
-    if not f:
-        raise Exception(f'invaild provider type {cfg_type}')
-    return f(**cfg)

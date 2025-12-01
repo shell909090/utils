@@ -24,13 +24,7 @@ import tempfile
 import subprocess
 from os import path
 
-import requests
-from gevent.pool import Pool
-
 import ai
-
-# import http.client as http_client
-# http_client.HTTPConnection.debuglevel = 1
 
 
 class Writer(object):
