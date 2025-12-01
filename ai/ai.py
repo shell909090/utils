@@ -10,11 +10,10 @@ import os
 import re
 import sys
 import json
-import random
 import logging
-from os import path
 
 import httpx
+from pydantic import BaseModel, Field
 
 
 def setup_logging():
@@ -60,62 +59,11 @@ class Provider(object):
             response = self.re_think.sub('', response)
         return response
 
-    def generate(self, model, input, remove_think=False, **kwargs):
-        response = self._generate(model, input, **kwargs)
+    def generate(self, model, prompt, remove_think=False, **kwargs):
+        response = self._generate(model, prompt, **kwargs)
         if remove_think:
             response = self.re_think.sub('', response)
         return response
-
-
-class Ollama(Provider):
-
-    name = 'ollama'
-
-    def __init__(self, endpoint, apikey=None, max_context_length=8192, num_batch=16, retries=3, **kwargs):
-        super().__init__(retries)
-        self.endpoint = endpoint
-        self.apikey = apikey
-        self.max_context_length = max_context_length
-        self.num_batch = num_batch
-
-    @staticmethod
-    def fmt_ollama_stat(data):
-        # 将所有浮点数输出改为小数点后两位格式
-        duration_total = data['total_duration'] / 10**9
-        prompt_eval_count = data['prompt_eval_count']
-        prompt_eval_duration = data['prompt_eval_duration'] / 10**9
-        eval_count = data['eval_count']
-        eval_duration = data['eval_duration'] / 10**9
-        eval_rate = eval_count / eval_duration
-        return f'total_duration: {duration_total:.2f}, prompt_eval_count: {prompt_eval_count}, prompt_eval_duration: {prompt_eval_duration:.2f}, eval_count: {eval_count}, eval_duration: {eval_duration:.2f}, eval_rate: {eval_rate:.2f}'
-
-    def _chat(self, model, messages):
-        req = {
-            'model': model,
-            'stream': False,
-            'messages': messages,
-            'options': {
-                'num_ctx': self.max_context_length,
-                'num_batch': self.num_batch,
-            },
-        }
-        data = self._send_req(f'{self.endpoint}/api/chat', model, json=req)
-        logging.info(self.fmt_ollama_stat(data))
-        return data['message']['content']
-
-    def _generate(self, model, input):
-        req = {
-            'model': model,
-            'stream': False,
-            'prompt': input,
-            'options': {
-                'num_ctx': self.max_context_length,
-                'num_batch': self.num_batch,
-            },
-        }
-        data = self._send_req(f'{self.endpoint}/api/generate', model, json=req)
-        logging.info(self.fmt_ollama_stat(data))
-        return data['response']
 
 
 class OpenAI(Provider):
@@ -127,10 +75,6 @@ class OpenAI(Provider):
         self.endpoint = endpoint
         self.apikey = apikey
 
-    @staticmethod
-    def fmt_openai_stat(usage):
-        return f"total_tokens: {usage['total_tokens']}, prompt_tokens: {usage['prompt_tokens']}, completion_tokens: {usage['completion_tokens']}"
-
     def _chat(self, model, messages):
         req = {
             'model': model,
@@ -138,18 +82,18 @@ class OpenAI(Provider):
             'messages': messages,
         }
         data = self._send_req(f'{self.endpoint}/chat/completions', model, json=req)
-        logging.info(self.fmt_openai_stat(data['usage']))
+        logging.info(json.dumps(data['usage']))
         return data['choices'][0]['message']['content']
 
-    def _generate(self, model, input):
+    def _generate(self, model, prompt):
         req = {
             'model': model,
             'stream': False,
-            'input': input,
+            'input': prompt,
         }
         data = self._send_req(f'{self.endpoint}/responses', model, json=req)
-        logging.info(self.fmt_openai_stat(data['usage']))
-        return data['output'][0]['content']['text']
+        logging.info(json.dumps(data['usage']))
+        return ''.join(msg['content'][0]['text'] for msg in data['output'] if msg['type'] == 'message')
 
     def transcription(self, model, fn, f, language='zh'):
         files = {
@@ -170,78 +114,45 @@ class Gemini(Provider):
 
     name = 'gemini'
 
-    def __init__(self, endpoint, apikey=None, retries=3, **kwargs):
+    class TranscriptSegment(BaseModel):
+        start: float = Field(description="Start time of the segment, number, in second")
+        end: float = Field(description="End time of the segment, number, in second")
+        text: str = Field(description="The transcribed text for this segment")
+
+
+    class TranscriptionResponse(BaseModel):
+        language: str = Field(description="Detected language of the audio")
+        segments: list[TranscriptSegment]
+
+    def __init__(self, endpoint=None, apikey=None, retries=3, **kwargs):
         super().__init__(retries)
-        self.endpoint = endpoint
-        self.apikey = apikey
+        from google import genai
+        # self.endpoint = endpoint
+        self.apikey = os.getenv('GEMINI_API_KEY')
+        self.client = genai.Client()
 
-    def _send_gemini_req(self, url, model, **kwargs):
-        if 'headers' not in kwargs:
-            kwargs['headers'] = {}
-        if 'json' in kwargs:
-            kwargs['headers']['Content-Type'] = 'application/json'
-            logging.debug(f'req:\n{json.dumps(kwargs["json"], indent=2)}')
-        if self.apikey:
-            kwargs['headers']['x-goog-api-key'] = self.apikey
-        logging.info(f'send request to {self.name}: {self.endpoint} {model}')
-        resp = self.sess.post(url, **kwargs)
-        if resp.status_code >= 400:
-            logging.error(resp.content)
-        resp.raise_for_status()
-        logging.info(f'received response from {self.name}')
-        data = resp.json()
-        logging.debug(f'resp:\n{json.dumps(data, indent=2)}')
-        return data
+    def _generate(self, model, prompt, **kwargs):
+        resp = self.client.models.generate_content(model=model, contents=prompt)
+        return resp.text
 
-    def _chat(self, model, messages, thinking_budget=None):
-        contents = []
-        for message in messages:
-            role = message.get('role')
-            content = message.get('content')
-            if not role or not content:
-                continue
-            # Gemini API expects 'user' or 'model' roles, mapping 'assistant' to 'model'
-            gemini_role = 'model' if role == 'assistant' else role
-            contents.append({
-                'role': gemini_role,
-                'parts': [{'text': content}]
-            })
-
-        req_body = {"contents": contents}
-        if thinking_budget is not None:
-            req_body['generationConfig'] = {
-                "thinkingConfig": {
-                    "thinkingBudget": thinking_budget
-                }
-            }
-        url = f'{self.endpoint}/models/{model}:generateContent'
-        resp = self._send_gemini_req(url, model, json=req_body)
-
-        # Extracting the response content
-        response_text = ""
-        if resp and 'candidates' in resp and resp['candidates']:
-            for candidate in resp['candidates']:
-                if 'content' in candidate and 'parts' in candidate['content']:
-                    for part in candidate['content']['parts']:
-                        if 'text' in part:
-                            response_text += part['text']
-        return response_text
-
-    def _generate(self, model, input_text, thinking_budget=None):
-        messages = [{'role': 'user', 'content': input_text}]
-        return self._chat(model, messages, thinking_budget)
+    def transcription(self, model, fn, f, language='中文'):
+        from google.genai import types
+        resp = self.client.models.generate_content(
+            model=model,
+            contents=[
+                f"请完全按照语音内容转录此音频文件，并将输出格式设置为清晰的文本稿。输出语言使用{language}。",
+                types.Part.from_bytes(data=f.read(), mime_type="audio/mp3")
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=self.TranscriptionResponse # Pass the Pydantic class here
+            ))
+        return json.loads(resp.text)['segments']
 
 
 def make_provider():
-    if os.getenv('OLLAMA_ENDPOINT'):
-        return Ollama(os.getenv('OLLAMA_ENDPOINT'), os.getenv('OLLAMA_APIKEY'), os.getenv('MAX_CONTEXT_LENGTH'))
+    if os.getenv('GEMINI_API_KEY'):
+        return Gemini()
     elif os.getenv('OPENAI_ENDPOINT'):
         return OpenAI(os.getenv('OPENAI_ENDPOINT'), os.getenv('OPENAI_APIKEY'))
-    elif os.getenv('GEMINI_APIKEY'):
-        return Gemini('https://generativelanguage.googleapis.com/v1beta', os.getenv('GEMINI_APIKEY'))
-    elif os.getenv('GROQ_APIKEY'):
-        return OpenAI('https://api.groq.com/openai/v1', os.getenv('GROQ_APIKEY'))
-    elif os.getenv('OPENROUTER_APIKEY'):
-        return OpenAI('https://openrouter.ai/api/v1', os.getenv('OPENROUTER_APIKEY'))
-    else:
-        raise Exception('provider not found in args')
+    raise Exception('provider not found in args')
