@@ -76,11 +76,8 @@ def park_segments(segments, max_context_length=8192):
 
 def translate_park(p):
     logging.debug(f'original:{p}')
-    messages = [
-        {'role': 'system', 'content': args.prompt},
-        {'role': 'user', 'content': f'<start>{p}</end>'},
-    ]
-    q = provider.chat(args.model, messages, remove_think=True)
+    prompt = f'你是一个AI个人助理，请阅读以下材料，将内容翻译为{language}。材料以<start>开始，以</end>结束。注意保持格式不变。注意保持语气。输出内容仅包括翻译结果。<start>{p}</end>'
+    q = provider.generate(args.model, prompt, remove_think=True)
     logging.debug(f'translated:{q}')
 
     for line in q.splitlines():
@@ -138,7 +135,7 @@ def main():
     parser.add_argument('--model', '-m', default=os.getenv('MODEL'), help='ollama model')
     parser.add_argument('--comparative', '-c', action='store_true', help='output both original text and translated')
     parser.add_argument('--language', '-l', default='中文')
-    parser.add_argument('--prompt', '-p', default='你是一个AI个人助理，请阅读以下材料，将内容翻译为{language}。材料以<start>开始，以</end>结束。注意保持格式不变。注意保持语气。输出内容仅包括翻译结果。')
+    parser.add_argument('--prompt', '-p', default='')
     parser.add_argument('--interval', '-i', type=int, default=10, help='wait between each API call')
     parser.add_argument('--force-overwrite', '-y', action='store_true')
     parser.add_argument('--max-context-length', '-mcl', type=int, default=8192, help='max content length in API call')
