@@ -12,9 +12,6 @@ import argparse
 
 import ai
 
-# import http.client as http_client
-# http_client.HTTPConnection.debuglevel = 1
-
 
 def main():
     global args
@@ -27,12 +24,9 @@ def main():
     provider = ai.make_provider()
 
     code = sys.stdin.read()
-    messages = [
-        {'role': 'user', 'content': '你是一个AI代码助理，你要帮助用户补全他的代码。代码以<code>开始，以</code>结束。当前光标所在位置是{{CURSOR}}。你需要在这个位置，写上你认为合适的代码。输出应当只包含补全代码，注意缩进对齐。'},
-        {'role': 'user', 'content': f'<code>{code}</code>'},
-    ]
+    prompt = f'你是一个AI代码助理，你要帮助用户补全他的代码。代码以<code>开始，以</code>结束。当前光标所在位置是{{CURSOR}}。你需要在这个位置，写上你认为合适的代码。输出应当只包含补全代码，注意缩进对齐。<code>{code}</code>'
 
-    response = provider.chat(args.model, messages, remove_think=args.remove_think)
+    response = provider.generate(args.model, prompt, remove_think=args.remove_think)
     response = provider.re_code.sub('', response)
     print(response)
 
