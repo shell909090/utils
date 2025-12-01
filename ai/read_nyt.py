@@ -24,14 +24,9 @@ def get_text(u):
         yield p.get_text().strip()
 
 
-def read_article(provider, args, u):
-    content = '\n'.join(get_text(u))
-    messages = [
-        {'role': 'user', 'content': '你是一个AI个人助理，请阅读以下材料，简述关键内容。材料以<start>开始，以</end>结束。无论材料以何种语言书写，你都要用中文总结。'},
-        {'role': 'user', 'content': f'<start>{content}</end>'},
-    ]
-
-    response = provider.chat(args.model, messages, remove_think=True)
+def read_article(provider, args, content):
+    prompt = f'你是一个AI个人助理，请阅读以下材料，简述关键内容。材料以<start>开始，以</end>结束。无论材料以何种语言书写，你都要用中文总结。<start>{content}</end>'
+    response = provider.generate(args.model, prompt, remove_think=True)
     print(response)
 
 
@@ -45,7 +40,8 @@ def main():
     provider = ai.make_provider()
 
     for u in args.rest:
-        read_article(provider, args, u)
+        content = '\n'.join(get_text(u))
+        read_article(provider, args, content)
 
 
 if __name__ == '__main__':
