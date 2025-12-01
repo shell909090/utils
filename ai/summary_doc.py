@@ -37,12 +37,9 @@ def chapter_doc(txt, max_size=8192):
         yield s
 
 
-def summary_chapter(c):
-    messages = [
-        {'role': 'system', 'content': args.prompt},
-        {'role': 'user', 'content': f'<start>{c}</end>'},
-    ]
-    return provider.chat(args.model, messages, remove_think=True)
+def summary_chapter(content):
+    prompt = f'你是一个AI个人助理，请阅读以下材料，简述主要观点和关键内容。材料以<start>开始，以</end>结束。简述要详细，最好给出引用。无论材料以何种语言书写，你都要用中文总结。<start>{content}</end>'
+    return provider.generate(args.model, prompt, remove_think=True)
 
 
 def summary_doc(doc, fp=None):
@@ -73,7 +70,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', '-m', default=os.getenv('MODEL'), help='ollama model')
     parser.add_argument('--interval', '-iv', type=int, help='let ollama cool down')
-    parser.add_argument('--prompt', '-p', default='你是一个AI个人助理，请阅读以下材料，简述主要观点和关键内容。材料以<start>开始，以</end>结束。简述要详细，最好给出引用。无论材料以何种语言书写，你都要用中文总结。')
     parser.add_argument('--remove-empty-line', '-rel', help='remove empty line')
     parser.add_argument('--chapter-output', '-co', help='filename extension of chapters')
     parser.add_argument('--summary-output', '-so', default='.sum', help='filename extension of summary')
