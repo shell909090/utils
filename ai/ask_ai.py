@@ -100,14 +100,14 @@ def main():
         for b in background:
             logging.debug(f'background: {b}')
 
-    messages = []
+    prompts = []
     if background:
-        messages.append({'role': 'user', 'content': '你是一个AI个人助理，请阅读以下材料，帮助用户回答问题。每篇材料以<start>开始，以</end>结束。回答问题的时候，需要给出每篇材料的原始信息引用和位置。'})
+        prompts.append('你是一个AI个人助理，请阅读以下材料，帮助用户回答问题。每篇材料以<start>开始，以</end>结束。回答问题的时候，需要给出每篇材料的原始信息引用和位置。')
         for doc in background:
-            messages.append({'role': 'user', 'content': f'<start>{doc}</end>'})
-    messages.append({'role': 'user', 'content': command})
+            prompts.append(f'<start>{doc}</end>')
+    prompts.append(command)
 
-    response = provider.chat(args.model, messages, remove_think=args.remove_think)
+    response = provider.generate(args.model, '\n'.join(prompts), remove_think=args.remove_think)
     print(response)
 
 
