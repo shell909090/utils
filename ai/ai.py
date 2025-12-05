@@ -35,6 +35,37 @@ class Provider(object):
         transport = httpx.HTTPTransport(retries=retries)
         self.sess = httpx.Client(transport=transport)
 
+    def remove_think(self, t):
+        return self.re_think.sub('', response)
+
+    def list_models(self):
+        raise Exception('not impl')
+
+    def chat(self, model, messages, **kwargs):
+        raise Exception('not impl')
+
+    def generate(self, model, prompt, **kwargs):
+        raise Exception('not impl')
+
+    def generate_content(self, model, prompt, **kwargs):
+        raise Exception('not impl')
+
+    def gen_image(self, model, prompt, format='image/jpeg', **kw):
+        raise Exception('not impl')
+
+    def transcription(self, model, fn, f, language='中文'):
+        raise Exception('not impl')
+
+
+class OpenAI(Provider):
+
+    name = 'openai'
+
+    def __init__(self, endpoint, apikey=None, retries=3, **kwargs):
+        super().__init__(retries)
+        self.endpoint = endpoint
+        self.apikey = apikey
+
     def _send_req(self, url, model, **kwargs):
         if 'headers' not in kwargs:
             kwargs['headers'] = {}
@@ -53,29 +84,7 @@ class Provider(object):
         logging.debug(f'resp:\n{json.dumps(data, indent=2)}')
         return data
 
-    def chat(self, model, messages, remove_think=False, **kwargs):
-        response = self._chat(model, messages, **kwargs)
-        if remove_think:
-            response = self.re_think.sub('', response)
-        return response
-
-    def generate(self, model, prompt, remove_think=False, **kwargs):
-        response = self._generate(model, prompt, **kwargs)
-        if remove_think:
-            response = self.re_think.sub('', response)
-        return response
-
-
-class OpenAI(Provider):
-
-    name = 'openai'
-
-    def __init__(self, endpoint, apikey=None, retries=3, **kwargs):
-        super().__init__(retries)
-        self.endpoint = endpoint
-        self.apikey = apikey
-
-    def _chat(self, model, messages):
+    def chat(self, model, messages, **kwargs):
         req = {
             'model': model,
             'stream': False,
@@ -85,7 +94,7 @@ class OpenAI(Provider):
         logging.info(json.dumps(data['usage']))
         return data['choices'][0]['message']['content']
 
-    def _generate(self, model, prompt):
+    def generate(self, model, prompt, **kwargs):
         req = {
             'model': model,
             'stream': False,
@@ -94,6 +103,17 @@ class OpenAI(Provider):
         data = self._send_req(f'{self.endpoint}/responses', model, json=req)
         logging.info(json.dumps(data['usage']))
         return ''.join(msg['content'][0]['text'] for msg in data['output'] if msg['type'] == 'message')
+
+    def gen_image(self, model, prompt, **kwargs):
+        req = {
+            'model': model,
+            'stream': False,
+            'prompt': prompt,
+        }
+        req.update(kw)
+        data = self._send_req(f'{self.endpoint}/images/generations', model, json=req)
+        logging.info(json.dumps(data['usage']))
+        print(data)  # TODO:
 
     def transcription(self, model, fn, f, language='zh'):
         files = {
@@ -127,13 +147,47 @@ class Gemini(Provider):
     def __init__(self, endpoint=None, apikey=None, retries=3, **kwargs):
         super().__init__(retries)
         from google import genai
-        # self.endpoint = endpoint
+        from google.genai import types
+        self.endpoint = os.getenv('GEMINI_ENDPOINT')
         self.apikey = os.getenv('GEMINI_API_KEY')
-        self.client = genai.Client()
+        kw = {}
+        if self.endpoint:
+            kw['http_options'] = types.HttpOptions(
+                base_url=self.endpoint,
+                api_version="v1beta" # 可选：显式指定 API 版本
+            )
+        self.client = genai.Client(**kw)
 
-    def _generate(self, model, prompt, **kwargs):
+    def list_models(self):
+        for m in self.client.models.list():
+            yield {'name': m.name, 'description': m.description, 'supported_actions': m.supported_actions}
+
+    def get_model(self, name):
+        mname = f'models/{name}'
+        for m in self.client.models.list():
+            if m.name == mname:
+                return {'name': m.name, 'description': m.description, 'supported_actions': m.supported_actions}
+        raise Exception(f'model {name} not found')
+
+    def generate(self, model, prompt, **kwargs):
         resp = self.client.models.generate_content(model=model, contents=prompt)
         return resp.text
+
+    def generate_content(self, model, contents, **kwargs):
+        return self.client.models.generate_content(model=model, contents=contents)
+
+    def gen_image(self, model, prompt, format='image/jpeg', **kwargs):
+        from google.genai import types
+        resp = self.client.models.generate_images(
+            model=model,
+            prompt=prompt,
+            config=types.GenerateImagesConfig(
+                number_of_images=1,
+                include_rai_reason=True,
+                output_mime_type=format,
+            ),
+        )
+        return resp.generated_images[0].image
 
     def transcription(self, model, fn, f, language='中文'):
         from google.genai import types
