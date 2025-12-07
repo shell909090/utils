@@ -1,0 +1,6 @@
+deep-translator
+opencv-python
+openai
+manga-ocr
+pyperclip
+pillow
