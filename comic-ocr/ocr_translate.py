@@ -11,6 +11,8 @@ import sys
 import time
 import logging
 import argparse
+import zipfile
+from io import BytesIO
 
 import pyperclip
 import numpy as np
@@ -55,6 +57,34 @@ class ClipboardImageGenerator(ImageGenerator):
 
             last_image = img
             yield img
+
+
+class ZipImageGenerator(ImageGenerator):
+
+    def __init__(self, zip_path):
+        self.zip_path = zip_path
+
+    def __iter__(self):
+        # Image file extensions to look for
+        image_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')
+
+        with zipfile.ZipFile(self.zip_path, 'r') as zf:
+            # Get all image files sorted by name
+            image_files = sorted([
+                name for name in zf.namelist()
+                if name.lower().endswith(image_extensions) and not name.startswith('__MACOSX')
+            ])
+
+            for image_file in image_files:
+                try:
+                    # Read image data from zip
+                    image_data = zf.read(image_file)
+                    # Convert to PIL Image
+                    img = Image.open(BytesIO(image_data))
+                    yield img
+                except Exception as e:
+                    logging.error(f"Failed to read image {image_file}: {e}")
+                    continue
 
 
 class PaddleOCRTextDetectionCutter(ImageGenerator):
@@ -167,7 +197,15 @@ def main():
     else:
         raise Exception(f'unknown translator provider: {args.translator_provider}')
 
-    image_generator = ClipboardImageGenerator()
+    if args.rest:
+        # Use ZipImageGenerator if a zip file path is provided
+        zip_path = args.rest[0]
+        image_generator = ZipImageGenerator(zip_path)
+        logging.info(f'Reading images from zip file: {zip_path}')
+    else:
+        # Use ClipboardImageGenerator by default
+        image_generator = ClipboardImageGenerator()
+        logging.info('Reading images from clipboard')
 
     if args.use_paddle_detection:
         image_generator = PaddleOCRTextDetectionCutter(image_generator)
