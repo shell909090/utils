@@ -1,6 +1,8 @@
 deep-translator
-opencv-python
-openai
 manga-ocr
-pyperclip
+numpy
+openai
+opencv-python
+paddleocr
 pillow
+pyperclip

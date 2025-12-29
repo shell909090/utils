@@ -61,8 +61,9 @@ class ClipboardImageGenerator(ImageGenerator):
 
 class ZipImageGenerator(ImageGenerator):
 
-    def __init__(self, zip_path):
+    def __init__(self, zip_path, output_file=None):
         self.zip_path = zip_path
+        self.output_file = output_file
 
     def __iter__(self):
         # Image file extensions to look for
@@ -81,6 +82,13 @@ class ZipImageGenerator(ImageGenerator):
                     image_data = zf.read(image_file)
                     # Convert to PIL Image
                     img = Image.open(BytesIO(image_data))
+                    logging.info(f"Processing image: {image_file}")
+
+                    # Write filename to output file if provided
+                    if self.output_file:
+                        self.output_file.write(f"\n## {image_file}\n")
+                        self.output_file.flush()
+
                     yield img
                 except Exception as e:
                     logging.error(f"Failed to read image {image_file}: {e}")
@@ -182,6 +190,7 @@ def main():
     parser.add_argument('--endpoint', '-e', default=os.getenv('OPENAI_ENDPOINT'))
     parser.add_argument('--copy-back', '-cb', action='store_true', help='copy the result of translate back to clipboard')
     parser.add_argument('--use-paddle-detection', '-pd', action='store_true', help='use PaddleOCR for text detection and cropping')
+    parser.add_argument('--output-file', '-o', type=str, help='output file to write translation results')
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
 
@@ -197,10 +206,16 @@ def main():
     else:
         raise Exception(f'unknown translator provider: {args.translator_provider}')
 
+    # Open output file if specified
+    output_file = None
+    if args.output_file:
+        output_file = open(args.output_file, 'w', encoding='utf-8')
+        logging.info(f'Writing results to: {args.output_file}')
+
     if args.rest:
         # Use ZipImageGenerator if a zip file path is provided
         zip_path = args.rest[0]
-        image_generator = ZipImageGenerator(zip_path)
+        image_generator = ZipImageGenerator(zip_path, output_file=output_file)
         logging.info(f'Reading images from zip file: {zip_path}')
     else:
         # Use ClipboardImageGenerator by default
@@ -211,27 +226,38 @@ def main():
         image_generator = PaddleOCRTextDetectionCutter(image_generator)
         logging.info('PaddleOCR text detection enabled')
 
-    for img in image_generator:
-        start_time = time.time()
-        jp_text = ocr(img)
+    try:
+        for img in image_generator:
+            start_time = time.time()
+            jp_text = ocr(img)
 
-        if not jp_text.strip():
-            continue
+            if not jp_text.strip():
+                continue
 
-        print(f"原文 (日语): {jp_text}")
+            print(f"原文 (日语): {jp_text}")
 
-        try:
-            cn_text = translator.translate(jp_text)
-        except Exception as e:
-            logging.error(e)
-            continue
+            try:
+                cn_text = translator.translate(jp_text)
+            except Exception as e:
+                logging.error(e)
+                continue
 
-        print(f"译文 (中文): \033[1;32m{cn_text}\033[0m") # 绿色文字显示
-        logging.info(f"耗时: {time.time() - start_time:.2f}s")
+            print(f"译文 (中文): \033[1;32m{cn_text}\033[0m") # 绿色文字显示
+            logging.info(f"耗时: {time.time() - start_time:.2f}s")
 
-        if args.copy_back:
-            pyperclip.copy(cn_text)
-            logging.info("translate copy back")
+            # Write to output file if specified
+            if output_file:
+                output_file.write(f"原文: {jp_text}\n")
+                output_file.write(f"译文: {cn_text}\n")
+                output_file.flush()
+
+            if args.copy_back:
+                pyperclip.copy(cn_text)
+                logging.info("translate copy back")
+    finally:
+        if output_file:
+            output_file.close()
+            logging.info(f'Output file closed: {args.output_file}')
 
 
 
