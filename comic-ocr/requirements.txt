@@ -1,8 +1,7 @@
-deep-translator
-manga-ocr
-numpy
-openai
-opencv-python
-paddleocr
-pillow
-pyperclip
+deep-translator>=1.11.4
+manga-ocr>=0.1.14
+numpy>=1.24.0
+openai>=2.9.0
+paddleocr>=2.7.0
+pillow>=12.0.0
+pyperclip>=1.11.0

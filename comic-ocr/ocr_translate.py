@@ -20,7 +20,7 @@ from PIL import ImageGrab, Image
 from manga_ocr import MangaOcr
 from deep_translator import GoogleTranslator
 from openai import OpenAI
-from paddleocr import PaddleOCR
+from paddleocr import TextDetection
 
 
 SYSTEM_PROMPT = """
@@ -95,30 +95,136 @@ class ZipImageGenerator(ImageGenerator):
                     continue
 
 
+class PaddleOCRTextDetection(object):
+
+    def __init__(self, padding=5, ai_merge_client=None, ai_merge_model=None):
+        # TextDetection uses lang and device through **kwargs
+        self.detector = TextDetection(device='cpu')
+        self.ocr = MangaOcr()
+        self.padding = padding
+        self.ai_merge_client = ai_merge_client
+        self.ai_merge_model = ai_merge_model
+
+    def __call__(self, img: Image) -> str:
+        # Convert PIL Image to numpy array for TextDetection
+        img_array = np.array(img)
+
+        # Use TextDetection to detect text boxes
+        result = self.detector.predict(img_array)
+
+        if not result or not result[0]:
+            return ''
+
+        # Extract detected polygons from result
+        dt_polys = result[0].get('dt_polys', [])
+        if len(dt_polys) == 0:
+            return ''
+
+        # Get image dimensions
+        img_width, img_height = img.size
+
+        # Sort dt_polys: right to left (for Japanese manga), top to bottom
+        # Calculate center point for each box for sorting
+        boxes_with_centers = []
+        for box in dt_polys:
+            points = np.array(box).astype(np.int32)
+            center_x = int(points[:, 0].mean())
+            center_y = int(points[:, 1].mean())
+            boxes_with_centers.append((box, center_x, center_y))
+
+        # Sort by Y (top to bottom) first, then by X (right to left) within same row
+        # Group by approximate rows (using Y // 50 for row grouping)
+        sorted_boxes = sorted(boxes_with_centers, key=lambda b: (b[2] // 50, -b[1]))
+
+        # Collect recognized text from all detected boxes
+        texts = []
+        for box, _, _ in sorted_boxes:
+            # box is a list of 4 points [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+            # Get bounding box coordinates
+            points = np.array(box).astype(np.int32)
+            x_min = int(points[:, 0].min())
+            y_min = int(points[:, 1].min())
+            x_max = int(points[:, 0].max())
+            y_max = int(points[:, 1].max())
+
+            # Add padding and ensure within image boundaries
+            x_min = max(0, x_min - self.padding)
+            y_min = max(0, y_min - self.padding)
+            x_max = min(img_width, x_max + self.padding)
+            y_max = min(img_height, y_max + self.padding)
+
+            # Crop the image based on bounding box with padding
+            cropped_img = img.crop((x_min, y_min, x_max, y_max))
+
+            # Recognize text in the cropped image
+            text = self.ocr(cropped_img)
+            if text.strip():
+                texts.append(text)
+
+        if not texts:
+            return ''
+
+        # Use AI to merge text fragments if client is provided
+        if self.ai_merge_client and self.ai_merge_model:
+            fragments_input = '\n'.join([f"Fragment {i+1}: {text}" for i, text in enumerate(texts)])
+            merge_prompt = f"""你是一个专业的漫画汉化助手。
+我将发给你一页漫画中提取出的【零散文本片段】（按从右到左、从上到下的阅读顺序排列）。
+请执行以下步骤：
+1. 【拼合】：根据日语语法和漫画语境，将断裂的句子、跨气泡的对话重新合并成完整的句子。
+2. 【输出】：输出合并后的完整句子，每行一句。不要输出 Fragment 编号，不要输出任何解释。
+
+输入：
+{fragments_input}
+
+输出："""
+
+            try:
+                completion = self.ai_merge_client.chat.completions.create(
+                    model=self.ai_merge_model,
+                    messages=[
+                        {"role": "user", "content": merge_prompt}
+                    ],
+                    temperature=0.3,
+                )
+                merged_text = completion.choices[0].message.content.strip()
+                return merged_text
+            except Exception as e:
+                logging.error(f"AI merge failed: {e}, falling back to concatenation")
+                return ''.join(texts)
+        else:
+            # Concatenate all recognized text without AI merge
+            return ''.join(texts)
+
+
 class PaddleOCRTextDetectionCutter(ImageGenerator):
 
-    def __init__(self, image_generator: ImageGenerator, use_angle_cls=True, lang='japan', use_gpu=False, padding=5):
+    def __init__(self, image_generator: ImageGenerator, padding=5):
         self.image_generator = image_generator
-        self.ocr = PaddleOCR(use_angle_cls=use_angle_cls, lang=lang, use_gpu=use_gpu, show_log=False)
+        # TextDetection uses lang and device through **kwargs
+        self.detector = TextDetection(device='cpu')
         self.padding = padding
 
     def __iter__(self):
         for img in self.image_generator:
-            # Convert PIL Image to numpy array for PaddleOCR
+            # Convert PIL Image to numpy array for TextDetection
             img_array = np.array(img)
 
-            # Use PaddleOCR to detect text boxes (only detection, no recognition)
-            result = self.ocr.ocr(img_array, rec=False)
+            # Use TextDetection to detect text boxes
+            result = self.detector.predict(img_array)
 
             if not result or not result[0]:
+                continue
+
+            # Extract detected polygons from result
+            dt_polys = result[0].get('dt_polys', [])
+            if len(dt_polys) == 0:
                 continue
 
             # Get image dimensions
             img_width, img_height = img.size
 
             # Iterate through detected text boxes
-            for box_info in result[0]:
-                box = box_info
+            for box in dt_polys:
                 # box is a list of 4 points [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
                 # Get bounding box coordinates
                 points = np.array(box).astype(np.int32)
@@ -191,11 +297,36 @@ def main():
     parser.add_argument('--copy-back', '-cb', action='store_true', help='copy the result of translate back to clipboard')
     parser.add_argument('--use-paddle-detection', '-pd', action='store_true', help='use PaddleOCR for text detection and cropping')
     parser.add_argument('--output-file', '-o', type=str, help='output file to write translation results')
+    parser.add_argument('--log-level', '-l', default='INFO',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                        help='set logging level (default: INFO)')
     parser.add_argument('rest', nargs='*', type=str)
     args = parser.parse_args()
 
-    ocr = MangaOcr()
-    logging.info('MangaOcr loaded')
+    # Configure logging level (force=True to override any existing configuration)
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format='%(levelname)s: %(message)s',
+        force=True
+    )
+
+    # Initialize OCR engine
+    if args.use_paddle_detection:
+        # Create OpenAI client for AI merge if using openai translator
+        ai_merge_client = None
+        ai_merge_model = None
+        if args.api_key and args.model:
+            if args.endpoint:
+                ai_merge_client = OpenAI(api_key=args.api_key, base_url=args.endpoint)
+            else:
+                ai_merge_client = OpenAI(api_key=args.api_key)
+            ai_merge_model = args.model
+
+        ocr = PaddleOCRTextDetection(ai_merge_client=ai_merge_client, ai_merge_model=ai_merge_model)
+        logging.info('PaddleOCR text detection and recognition loaded')
+    else:
+        ocr = MangaOcr()
+        logging.info('MangaOcr loaded')
 
     if args.translator_provider == 'google':
         translator = GoogleTranslatorWrapper(source='auto', target=args.target_language)
@@ -221,10 +352,6 @@ def main():
         # Use ClipboardImageGenerator by default
         image_generator = ClipboardImageGenerator()
         logging.info('Reading images from clipboard')
-
-    if args.use_paddle_detection:
-        image_generator = PaddleOCRTextDetectionCutter(image_generator)
-        logging.info('PaddleOCR text detection enabled')
 
     try:
         for img in image_generator:
