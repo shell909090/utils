@@ -29,6 +29,49 @@ SYSTEM_PROMPT = """
 """
 
 
+class Translator(object):
+
+    def translate(self, text):
+        pass
+
+
+class GoogleTranslatorWrapper(Translator):
+
+    def __init__(self, source='auto', target='zh-CN'):
+        self.translator = GoogleTranslator(source=source, target=target)
+
+    def translate(self, text):
+        if not text.strip():
+            return ''
+        return self.translator.translate(text)
+
+
+class OpenAITranslator(Translator):
+
+    def __init__(self, api_key, model, endpoint=None):
+        if endpoint:
+            self.client = OpenAI(api_key=api_key, base_url=endpoint)
+        else:
+            self.client = OpenAI(api_key=api_key)
+        self.model = model
+
+    def translate(self, text):
+        if not text.strip():
+            return ''
+        try:
+            completion = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": text}
+                ],
+                temperature=0.8,
+            )
+            return completion.choices[0].message.content.strip()
+        except Exception as e:
+            return f"[API 请求出错: {e}]"
+
+
 def get_img_from_clipboard():
     last_image = None
     while True:
@@ -48,23 +91,6 @@ def get_img_from_clipboard():
         yield img
 
 
-def translate_with_openai(client, args, text):
-    if not text.strip():
-        return ''
-    try:
-        completion = client.chat.completions.create(
-            model=args.model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": text}
-            ],
-            temperature=0.8,
-        )
-        return completion.choices[0].message.content.strip()
-    except Exception as e:
-        return f"[API 请求出错: {e}]"
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--translator-provider', '-p', default='google', help='could be "google" or "openai"')
@@ -80,13 +106,10 @@ def main():
     logging.info('MangaOcr loaded')
 
     if args.translator_provider == 'google':
-        translator = GoogleTranslator(source='auto', target=args.target_language)
+        translator = GoogleTranslatorWrapper(source='auto', target=args.target_language)
         logging.info(f'GoogleTranslator loaded, target language is {args.target_language}')
     elif args.translator_provider == 'openai':
-        if args.endpoint:
-            client = OpenAI(api_key=args.api_key, base_url=args.endpoint)
-        else:
-            client = OpenAI(api_key=args.api_key)
+        translator = OpenAITranslator(api_key=args.api_key, model=args.model, endpoint=args.endpoint)
         logging.info(f'Use OpenAI service to translate')
     else:
         raise Exception(f'unknown translator provider: {args.translator_provider}')
@@ -101,10 +124,7 @@ def main():
         print(f"原文 (日语): {jp_text}")
 
         try:
-            if args.translator_provider == 'google':
-                cn_text = translator.translate(jp_text)
-            elif args.translator_provider == 'openai':
-                cn_text = translate_with_openai(client, args, jp_text)
+            cn_text = translator.translate(jp_text)
         except Exception as e:
             logging.error(e)
             continue
