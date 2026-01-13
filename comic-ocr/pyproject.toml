@@ -9,8 +9,8 @@ dependencies = [
     "manga-ocr>=0.1.14",
     "numpy>=1.24.0",
     "openai>=2.9.0",
-    "opencv-python>=4.12.0.88",
     "paddleocr>=2.7.0",
+    "paddlepaddle>=3.2.2",
     "pillow>=12.0.0",
     "pyperclip>=1.11.0",
 ]
