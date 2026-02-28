@@ -141,7 +141,7 @@ _user() {
     CFG=~/.bashrc
     if ! grep '^PATH' "$CFG"
     then
-	sed -i '4iPATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:~/bin:~/.local/bin"' "$CFG"
+	sed -i '4iPATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$HOME/bin:$HOME/.local/bin"' "$CFG"
     fi
     set-bash-config "export EDITOR" "$EDITOR"
     set-bash-config "export DEBEMAIL" "$EMAIL"
