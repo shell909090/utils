@@ -100,7 +100,7 @@ def diff_status(cur, his):
     for name in timeouted:
         status = his[name]
         status['ago'] = (st-status['handshake_timestamp'])
-        yield 'user timeout, name: {name}, endpoint: {endpoint}, ago: {ago}'.format(**status)
+        # yield 'user timeout, name: {name}, endpoint: {endpoint}, ago: {ago}'.format(**status)
         del his[name]
 
 
@@ -148,21 +148,24 @@ def main():
         historial_status = {}
     logging.debug('history: %s', json.dumps(historial_status, indent=2))
 
+    his_keys = set(historial_status.keys())
     diff = list(diff_status(status, historial_status))
-    if not diff:
+    changed = bool(diff) or his_keys != set(historial_status.keys())
+    if not changed:
         logging.info('no change, quit.')
         return
 
-    for msg in diff:
-        logging.warning(msg)
-
-    if args.syslog:
-        syslog = setup_syslog((args.syslog, 514))
+    if diff:
         for msg in diff:
-            syslog.info(msg)
+            logging.warning(msg)
 
-    if args.smtp:
-        sendmail('\n'.join(diff))
+        if args.syslog:
+            syslog = setup_syslog((args.syslog, 514))
+            for msg in diff:
+                syslog.info(msg)
+
+        if args.smtp:
+            sendmail('\n'.join(diff))
 
     with open(path.expanduser(args.status), 'w') as fo:
         json.dump(historial_status, fo, indent=2)
