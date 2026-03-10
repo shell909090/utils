@@ -142,7 +142,7 @@ def main():
         return
 
     try:
-        with open(path.expanduser(args.status)) as fi:
+        with open(path.expanduser(args.status.format(iface=args.iface))) as fi:
             historial_status = json.load(fi)
     except:
         historial_status = {}
@@ -167,7 +167,7 @@ def main():
         if args.smtp:
             sendmail('\n'.join(diff))
 
-    with open(path.expanduser(args.status), 'w') as fo:
+    with open(path.expanduser(args.status.format(iface=args.iface)), 'w') as fo:
         json.dump(historial_status, fo, indent=2)
     logging.info(f'update db: {args.status}')
 
