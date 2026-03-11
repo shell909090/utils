@@ -119,7 +119,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--loglevel', '-l', default='INFO', help='log level')
     parser.add_argument('--iface', '-i', default='wg0', help='wg interface')
-    parser.add_argument('--timeout', '-t', type=int, default=900, help='how long will peer timeout')
+    parser.add_argument('--timeout', '-t', type=int, default=3600, help='how long will peer timeout')
     parser.add_argument('--map', '-m', default='/etc/wireguard/{iface}.map.json', help='wg map file')
     parser.add_argument('--status', '-st', default='/etc/wireguard/{iface}.status.json', help='wg status file')
     parser.add_argument('--printout', '-p', action='store_true', help='print out status and quit')
