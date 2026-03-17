@@ -11,6 +11,7 @@
 '''
 import os
 import sys
+import glob
 import json
 import logging
 import argparse
@@ -18,7 +19,7 @@ import datetime
 import tempfile
 import subprocess
 from os import path
-from urllib.parse import urlparse, ParseResult
+from urllib.parse import quote, urlparse, urlunparse
 
 import requests
 
@@ -41,7 +42,21 @@ def jsondump(fp, obj):
 
 def geturl(cfg, url, **kw):
     logger.info(f'get {url}')
-    return requests.get(url, headers=cfg['headers'], **kw)
+    resp = requests.get(url, headers=cfg['headers'], timeout=cfg.get('timeout', 60), **kw)
+    resp.raise_for_status()
+    return resp
+
+
+def authed_clone_url(cfg, repo):
+    parsed = urlparse(repo['clone_url'])
+    if parsed.scheme != 'https':
+        return repo['clone_url']
+    user = quote(cfg.get('git_username', cfg['username']), safe='')
+    token = quote(cfg['token'], safe='')
+    netloc = f'{user}:{token}@{parsed.hostname}'
+    if parsed.port:
+        netloc += f':{parsed.port}'
+    return urlunparse(parsed._replace(netloc=netloc))
 
 
 def get_repos(cfg):
@@ -49,11 +64,12 @@ def get_repos(cfg):
     # https://stackoverflow.com/questions/21907278/github-api-using-repo-scope-but-still-cant-see-private-repos
     repos = []
     # 10000 repos maximum
-    for i in range(100):
+    for i in range(1, 101):
         params = {'type': 'all', 'per_page': '100', 'page': str(i)}
         resp = geturl(cfg, 'https://api.github.com/user/repos', params=params)
-        repos.extend(resp.json())
-        if len(resp.json()) < 100:
+        page_repos = resp.json()
+        repos.extend(page_repos)
+        if len(page_repos) < 100:
             break
     if cfg.get('onlyuser', True):
         repos = [repo for repo in repos if repo['owner']['login'] == cfg['username']]
@@ -68,9 +84,20 @@ def grab_repo(cfg, repo):
     name = repo['name']
     logger.info('grab %s' % name)
     issues_url = repo['issues_url'][:-9]
-    resp = geturl(cfg, issues_url)
-    jsondump(path.join(cfg['dest'], name+'_issues.json'), resp.json())
-    subprocess.run(['git', 'clone', '--mirror', repo['clone_url'], path.join(cfg['dest'], name)])
+    issues = []
+    for i in range(1, 10001):
+        resp = geturl(cfg, issues_url, params={'state': 'all', 'per_page': '100', 'page': str(i)})
+        page_issues = resp.json()
+        issues.extend(page_issues)
+        if len(page_issues) < 100:
+            break
+    jsondump(path.join(cfg['dest'], name+'_issues.json'), issues)
+    clone_url = authed_clone_url(cfg, repo)
+    repo_dir = path.join(cfg['dest'], name)
+    if path.exists(repo_dir):
+        subprocess.run(['git', '-C', repo_dir, 'remote', 'update'], check=True)
+    else:
+        subprocess.run(['git', 'clone', '--mirror', clone_url, repo_dir], check=True)
 
 
 def backup_repos(cfg):
@@ -102,16 +129,18 @@ def main():
 
     if cfg.get('zip', True):
         cfg['destzip'] = cfg['dest']
-        tmpdir = tempfile.TemporaryDirectory()
-        cfg['dest'] = tmpdir.name
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg['dest'] = tmpdir
+            backup_repos(cfg)
 
-    backup_repos(cfg)
-
-    if cfg.get('zip', True):
-        curdir = os.getcwd()
-        os.chdir(cfg['dest'])
-        subprocess.run(['7z', 'a', cfg['destzip'], "*"])
-        os.chdir(curdir)
+            curdir = os.getcwd()
+            os.chdir(cfg['dest'])
+            try:
+                subprocess.run(['7z', 'a', cfg['destzip']] + glob.glob('*'), check=True)
+            finally:
+                os.chdir(curdir)
+    else:
+        backup_repos(cfg)
 
 
 if __name__ == '__main__':
