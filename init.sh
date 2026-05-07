@@ -76,7 +76,7 @@ ipXtables() {
     fi
 
     $IPT -F
-    $IPT -A INPUT -m conntrack --state RELATED,ESTABLISHED -j ACCEPT
+    $IPT -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
     $IPT -A INPUT -i lo -j ACCEPT
     if [ "$1" == "ipv4" ]; then
 	$IPT -A INPUT -p icmp -j ACCEPT
@@ -109,17 +109,41 @@ _sysctl() {
     CFG=/etc/sysctl.d/net.conf
     if [ ! -e $CFG ]; then
 	cat > $CFG <<EOF
+# 高级拥塞控制算法
 net.ipv4.tcp_congestion_control = bbr
 net.core.default_qdisc = fq
+# 大缓冲区，牺牲内存换取网络性能
 net.core.rmem_default = 2621440
 net.core.rmem_max = 16777216
 net.core.wmem_default = 655360
 net.core.wmem_max = 16777216
 net.ipv4.tcp_rmem = 4096 2621440 16777216
 net.ipv4.tcp_wmem = 4096 655360 16777216
+# 快速失败
 net.ipv4.tcp_retries2 = 8
 EOF
 	sysctl -p /etc/sysctl.d/net.conf
+    fi
+    CFG=/etc/sysctl.d/hardening.conf
+    if [ ! -e $CFG ]; then
+	cat > $CFG <<EOF
+# 反向路径过滤（防 IP 欺骗）
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+# 拒绝 ICMP 重定向
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+# 拒绝源路由包
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.default.accept_source_route = 0
+# 内核指针隐藏（1=仅限 CAP_SYSLOG，2=完全隐藏）
+kernel.kptr_restrict = 1
+# 内核日志访问控制
+kernel.dmesg_restrict = 1
+EOF
+	sysctl -p /etc/sysctl.d/hardening.conf
     fi
 }
 
