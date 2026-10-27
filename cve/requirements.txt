@@ -1,2 +1,2 @@
-nvdlib>=0.8.3
-gevent>=25.9.1
+nvdlib>=0.9.0
+gevent>=26.9.0

@@ -1,4 +1,8 @@
-*.pyc
-__pycache__
+*.py[cod]
+__pycache__/
 tags
 TAGS
+.venv/
+
+# Crawler configuration may contain credentials.
+/crawlers/**/*.conf
