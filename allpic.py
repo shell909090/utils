@@ -8,11 +8,11 @@ import gevent
 from gevent import pool, monkey
 monkey.patch_all()
 
-import sys
+import argparse
 import time
 import logging
-from os import path
-from urllib.parse import urlparse, urljoin
+from pathlib import Path
+from urllib.parse import urlparse, urljoin, urldefrag
 
 from bs4 import BeautifulSoup
 # from lxml import etree
@@ -37,34 +37,62 @@ def download(url, **kw):
     logging.info(f'download {url}')
     headers = {'user-agent': USER_AGENT}
     # kw['verify'] = False
+    kw.setdefault('timeout', 30)
     resp = session.get(url, headers=headers, **kw)
+    resp.raise_for_status()
     time.sleep(1)
     return resp
 
 
-def save_pic(img, baseurl):
-    url = img.get('lazyload-src') or img.get('src') or img.get('file')
-    url = urljoin(baseurl, url)
-    filename = path.basename(url)
-    if '?' in filename:
-        filename = filename.split('?', 1)[0]
+def save_pic(url, filename):
     resp = download(url)
-    if resp.status_code == 200:
-        with open(filename, 'wb') as fo:
-            fo.write(resp.content)
+    filename.write_bytes(resp.content)
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Download images from HTML img tags.')
+    parser.add_argument('urls', nargs='+')
+    parser.add_argument('-o', '--output', type=Path, default=Path('.'))
+    args = parser.parse_args()
+    args.output.mkdir(parents=True, exist_ok=True)
     p = pool.Pool(5)
-    for url in sys.argv[1:]:
-        baseurl = url
-        if baseurl[-1] != '/':
-            baseurl = path.dirname(baseurl)
+    jobs = []
+    seen = set()
+    filenames = set()
+    for url in args.urls:
         resp = download(url)
+        baseurl = resp.url
         doc = BeautifulSoup(resp.text, 'lxml')
+        base = doc.find('base', href=True)
+        if base:
+            baseurl = urljoin(baseurl, base['href'])
         for img in doc.select('img'):
-            p.spawn(save_pic, img, baseurl)
+            src = (img.get('lazyload-src') or img.get('data-src')
+                   or img.get('file') or img.get('src'))
+            if not src:
+                continue
+            image_url = urldefrag(urljoin(baseurl, src))[0]
+            if urlparse(image_url).scheme not in ('http', 'https'):
+                logger.warning('Skipping non-HTTP image: %s', image_url[:100])
+                continue
+            if image_url in seen:
+                continue
+            seen.add(image_url)
+            name = Path(urlparse(image_url).path).name
+            if name in ('', '.', '..'):
+                name = 'image'
+            filename = args.output / name
+            index = 1
+            while filename in filenames or filename.exists():
+                filename = args.output / f'{Path(name).stem}-{index}{Path(name).suffix}'
+                index += 1
+            filenames.add(filename)
+            jobs.append(p.spawn(save_pic, image_url, filename))
     p.join()
+    failures = sum(not job.successful() for job in jobs)
+    logger.info('Downloaded %d images; %d failed', len(jobs) - failures, failures)
+    if failures:
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':
