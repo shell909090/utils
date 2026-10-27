@@ -1,6 +1,7 @@
 # Crawlers
 
-Standalone crawler scripts, with Python dependencies managed by uv.
+Two crawler scripts remain: `allpic.py` and `ehentai.py`.
+Python dependencies are managed by uv.
 The uv environment requires Python 3.13 or newer.
 
 ```sh
@@ -22,15 +23,9 @@ scripts work with those versions or that their target websites still work.
 | requests | HTTP requests across the Python crawlers |
 | gevent | Concurrent downloads in image crawlers |
 | lxml | HTML parsing, including Beautiful Soup's `lxml` backend |
-| cssselect | `lxml.cssselect.CSSSelector` in `4chan.py`, `douban/pic.py` |
 
 ## Compatibility work still required
 
-- Some scripts still use Python 2 syntax or standard-library APIs such as
-  `urllib.urlopen` and `xrange`. Installing dependencies
-  does not migrate these scripts to Python 3.
-- `4chan.py` imports a missing local `utils` module for `initlog`.
-  An unrelated package named `utils` is deliberately not installed.
 - External commands, service credentials and website compatibility need
   separate checks before running each script. No crawler is executed during
   environment setup.
