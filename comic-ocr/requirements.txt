@@ -1,7 +1,8 @@
 deep-translator>=1.11.4
-manga-ocr>=0.1.14
-numpy>=1.24.0
-openai>=2.9.0
-paddleocr>=2.7.0
-pillow>=12.0.0
+manga-ocr>=0.1.16
+numpy>=2.5.4
+openai>=3.40.0
+paddleocr>=3.4.1
+paddlepaddle>=3.3.1
+pillow>=13.0.0
 pyperclip>=1.11.0
