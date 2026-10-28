@@ -1,0 +1,16 @@
+[project]
+name = "comic-ocr"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "deep-translator>=1.11.4",
+    "manga-ocr>=0.1.16",
+    "numpy>=2.5.4",
+    "openai>=3.40.0",
+    "paddleocr>=3.4.1",
+    "paddlepaddle>=3.3.1",
+    "pillow>=13.0.0",
+    "pyperclip>=1.11.0",
+]
