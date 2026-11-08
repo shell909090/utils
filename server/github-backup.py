@@ -125,7 +125,6 @@ def main():
         cfg['dest'] = args.dest
     now = datetime.datetime.now()
     cfg['dest'] = path.abspath(path.expanduser(now.strftime(cfg['dest'])))
-    logger.debug(cfg)
 
     if cfg.get('zip', True):
         cfg['destzip'] = cfg['dest']

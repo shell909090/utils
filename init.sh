@@ -9,13 +9,25 @@ _update() {
 }
 
 _aptsrc() {
-    CFG=/etc/apt/sources.list
+    CFG=/etc/apt/sources.list.d/debian.sources
     if [ ! -e $CFG ]; then
+	if [ -s /etc/apt/sources.list ]; then
+	    echo "Existing /etc/apt/sources.list: migrate its entries before creating $CFG" >&2
+	    return 1
+	fi
+	mkdir -p /etc/apt/sources.list.d || return
 	cat > $CFG <<EOF
-deb http://ftp.cn.debian.org/debian/ trixie main contrib non-free non-free-firmware
-deb http://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
-deb http://ftp.cn.debian.org/debian/ trixie-updates main contrib non-free non-free-firmware
-deb http://ftp.cn.debian.org/debian/ trixie-backports main contrib non-free non-free-firmware
+Types: deb
+URIs: https://mirrors.ustc.edu.cn/debian
+Suites: trixie trixie-updates trixie-backports
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: https://mirrors.ustc.edu.cn/debian-security
+Suites: trixie-security
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 EOF
     fi
 }
@@ -25,6 +37,7 @@ _aptproxy() {
     if [ ! -e $CFG ]; then
 	cat > $CFG <<EOF
 Acquire::http::Proxy "http://router.lan:8118/";
+Acquire::https::Proxy "http://router.lan:8118/";
 EOF
     fi
 }
@@ -150,7 +163,7 @@ EOF
 _service() {
     dpkg-reconfigure locales
     dpkg-reconfigure tzdata
-    ln -sf bash /bin/sh
+    # ln -sf bash /bin/sh
 }
 
 set-bash-config() {

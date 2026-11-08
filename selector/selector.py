@@ -62,7 +62,7 @@ def inputs(d, fmts):
                 pass
         elif fmt == 'yaml':
             try:
-                return __import__("yaml").load(d)
+                return __import__("yaml").safe_load(d)
             except:
                 pass
         elif fmt == 'eval':
