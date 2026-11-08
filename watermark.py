@@ -50,11 +50,12 @@ def watermark(src):
     font = ImageFont.truetype(args.font, args.fontsize)
 
     draw = ImageDraw.Draw(img)
-    txt_width, txt_height = draw.textsize(args.watermark, font)
+    left, top, right, bottom = draw.textbbox((0, 0), args.watermark, font=font)
+    txt_width, txt_height = max(1, right - left), max(1, bottom - top)
 
     txt = Image.new('RGBA', (txt_width, txt_height), (0,0,0,0))
     draw = ImageDraw.Draw(txt)
-    draw.text((0,0), args.watermark, fill=(0,0,0,args.alpha), font=font)
+    draw.text((-left, -top), args.watermark, fill=(0,0,0,args.alpha), font=font)
     txt = txt.rotate(args.rotate, expand=1)
     txt_width, txt_height = txt.size
 
